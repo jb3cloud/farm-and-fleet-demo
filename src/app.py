@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 import os
 import traceback
+from contextlib import redirect_stdout
 from datetime import UTC, datetime
+from io import StringIO
 from typing import Annotated
 
 import chainlit as cl
@@ -19,6 +21,7 @@ from semantic_kernel.functions import kernel_function
 
 # Import plugins
 from plugins import DatabasePlugin, FrictionPointSearchPlugin
+from plugins.analytics import StatisticalAnalyticsPlugin
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -70,6 +73,7 @@ def load_system_prompt() -> str:
         )
         dynamic_context += "- Available Functions: CustomerInsights plugin with 5 core analytical functions\n"
         dynamic_context += "- Available Functions: DatabaseInsights plugin with 4 core SQL query functions\n"
+        dynamic_context += "- Available Functions: StatisticalAnalytics plugin with 5 predictive analytics functions\n"
         dynamic_context += "- DateTime plugin available for temporal context\n"
 
         return system_prompt + dynamic_context
@@ -90,14 +94,22 @@ class DateTimePlugin:
 
 
 class CodeExecutionPlugin:
-    @kernel_function(name="execute_code", description="Executes simple Python code")
+    @kernel_function(
+        name="execute_code",
+        description="Executes simple Python code and returns stdout from print statements",
+    )
     def execute_code(
-        self, code: Annotated[str, "Simple python code to execute using exec()"]
+        self,
+        code: Annotated[str, "Simple python code to execute"],
     ) -> str:
         """Executes Python code."""
         try:
-            exec(code)
-            return "Code executed successfully."
+            f = StringIO()
+            with redirect_stdout(f):
+                exec(code)
+                output = f.getvalue()
+                logger.info(f"Code executed successfully: {output}")
+            return output or "Code executed successfully."
         except Exception as e:
             return f"Error executing code: {str(e)}"
 
@@ -201,6 +213,20 @@ async def on_chat_start() -> None:
                 "The chat will continue to work, but database query functions won't be available."
             ).send()
 
+        # Add the StatisticalAnalyticsPlugin for predictive analytics
+        logger.info("Adding StatisticalAnalyticsPlugin...")
+        try:
+            analytics_plugin = StatisticalAnalyticsPlugin()
+            kernel.add_plugin(analytics_plugin, plugin_name="StatisticalAnalytics")
+            logger.info("StatisticalAnalyticsPlugin added successfully")
+        except Exception as e:
+            logger.warning(f"Failed to add StatisticalAnalyticsPlugin: {str(e)}")
+            # Continue without the plugin rather than failing completely
+            await cl.Message(
+                content=f"⚠️ **Plugin Warning**: Statistical Analytics plugin failed to load: {str(e)}\n\n"
+                "The chat will continue to work, but predictive analytics functions won't be available."
+            ).send()
+
         # Instantiate and add the Chainlit filter to the kernel
         logger.info("Setting up Chainlit filter...")
         sk_filter = cl.SemanticKernelFilter(kernel=kernel)  # pyright: ignore[reportUnusedVariable]  # noqa: F841
@@ -244,6 +270,14 @@ async def on_chat_start() -> None:
         )
         capabilities.append(
             "I can execute safe SQL queries and provide statistical summaries"
+        )
+
+        # Analytics capabilities are always available
+        capabilities.append(
+            "I can perform predictive analytics on customer feedback and business data"
+        )
+        capabilities.append(
+            "I can detect trends, assess churn risk, and identify anomalies using statistical methods"
         )
 
         welcome_msg = (

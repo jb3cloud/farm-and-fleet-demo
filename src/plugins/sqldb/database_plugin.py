@@ -119,14 +119,18 @@ class DatabasePlugin:
                             if column_desc:
                                 # Add business context (not technical details)
                                 if "business_meaning" in column_desc:
-                                    col_info["business_meaning"] = column_desc["business_meaning"]
+                                    col_info["business_meaning"] = column_desc[
+                                        "business_meaning"
+                                    ]
 
                                 if "usage_notes" in column_desc:
                                     col_info["usage_notes"] = column_desc["usage_notes"]
 
                                 # Add special handling for JSON columns
-                                if ("json" in str(column.type).lower() or
-                                    "azure_sql_functions" in column_desc):
+                                if (
+                                    "json" in str(column.type).lower()
+                                    or "azure_sql_functions" in column_desc
+                                ):
                                     if "azure_sql_functions" in column_desc:
                                         col_info["azure_sql_functions"] = column_desc[
                                             "azure_sql_functions"
@@ -645,7 +649,9 @@ class DatabasePlugin:
                         if column_desc:
                             guidance["column_specific"] = {
                                 "column_name": column_name,
-                                "business_meaning": column_desc.get("business_meaning", ""),
+                                "business_meaning": column_desc.get(
+                                    "business_meaning", ""
+                                ),
                                 "azure_sql_functions": column_desc.get(
                                     "azure_sql_functions", []
                                 ),
@@ -659,7 +665,9 @@ class DatabasePlugin:
                         for col_name, col_data in columns.items():
                             if "azure_sql_functions" in col_data:
                                 json_columns[col_name] = {
-                                    "business_meaning": col_data.get("business_meaning", ""),
+                                    "business_meaning": col_data.get(
+                                        "business_meaning", ""
+                                    ),
                                     "query_examples": col_data.get(
                                         "query_examples", []
                                     ),
@@ -670,7 +678,9 @@ class DatabasePlugin:
 
                     # Add specialized patterns from data dictionary if available
                     if "specialized_patterns" in table_dict:
-                        guidance["specialized_patterns"] = table_dict["specialized_patterns"]
+                        guidance["specialized_patterns"] = table_dict[
+                            "specialized_patterns"
+                        ]
 
             # If no table-specific patterns, provide generic JSON patterns
             if "specialized_patterns" not in guidance:
@@ -679,8 +689,8 @@ class DatabasePlugin:
                         "description": "Generic patterns for analyzing JSON arrays",
                         "examples": [
                             "-- Extract array elements\nSELECT JSON_VALUE(item.value, '$.property') as property_value\nFROM table_name \nCROSS APPLY OPENJSON(json_column) as item",
-                            "-- Count by property\nSELECT JSON_VALUE(item.value, '$.property') as property, COUNT(*) as count\nFROM table_name \nCROSS APPLY OPENJSON(json_column) as item\nGROUP BY JSON_VALUE(item.value, '$.property')"
-                        ]
+                            "-- Count by property\nSELECT JSON_VALUE(item.value, '$.property') as property, COUNT(*) as count\nFROM table_name \nCROSS APPLY OPENJSON(json_column) as item\nGROUP BY JSON_VALUE(item.value, '$.property')",
+                        ],
                     }
                 }
 

@@ -45,7 +45,9 @@ class DatabaseClient:
         sql_tables = os.getenv("SQL_TABLES")
         self.allowed_tables = None
         if sql_tables:
-            self.allowed_tables = [table.strip() for table in sql_tables.split(",") if table.strip()]
+            self.allowed_tables = [
+                table.strip() for table in sql_tables.split(",") if table.strip()
+            ]
             logger.info(f"Table access restricted to: {self.allowed_tables}")
 
         if not all([self.server, self.database, self.username, self.password]):
@@ -57,8 +59,10 @@ class DatabaseClient:
         self._metadata: MetaData | None = None
         self._table_warnings: list[str] = []
         self._data_dictionaries: dict[str, dict[str, Any]] = {}
-        self._dictionary_path = os.getenv("SQL_DATA_DICTIONARY_PATH",
-                                        os.path.join(os.path.dirname(__file__), "data_dictionaries"))
+        self._dictionary_path = os.getenv(
+            "SQL_DATA_DICTIONARY_PATH",
+            os.path.join(os.path.dirname(__file__), "data_dictionaries"),
+        )
 
         # Load data dictionaries on initialization
         self._load_data_dictionaries()
@@ -117,18 +121,26 @@ class DatabaseClient:
                     if found_tables:
                         filtered_metadata = MetaData()
                         for table_name in found_tables:
-                            filtered_metadata.reflect(bind=engine, schema=self.schema, only=[table_name])
+                            filtered_metadata.reflect(
+                                bind=engine, schema=self.schema, only=[table_name]
+                            )
                         self._metadata = filtered_metadata
                     else:
                         # No valid tables found, use empty metadata
                         self._metadata = MetaData()
 
                     self._metadata = filtered_metadata
-                    logger.info(f"Filtered to {len(found_tables)} allowed tables: {found_tables}")
+                    logger.info(
+                        f"Filtered to {len(found_tables)} allowed tables: {found_tables}"
+                    )
                     if self._table_warnings:
-                        logger.warning(f"Table warnings: {len(self._table_warnings)} tables not found")
+                        logger.warning(
+                            f"Table warnings: {len(self._table_warnings)} tables not found"
+                        )
                 else:
-                    logger.info(f"Reflected {len(self._metadata.tables)} tables from schema '{self.schema}'")
+                    logger.info(
+                        f"Reflected {len(self._metadata.tables)} tables from schema '{self.schema}'"
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to reflect database schema: {str(e)}")
@@ -366,7 +378,7 @@ class DatabaseClient:
 
             for json_file in json_files:
                 try:
-                    with open(json_file, encoding='utf-8') as f:
+                    with open(json_file, encoding="utf-8") as f:
                         dictionary_data = json.load(f)
 
                     # Extract table name from the dictionary or filename
@@ -379,7 +391,9 @@ class DatabaseClient:
                     logger.info(f"Loaded data dictionary for table: {table_name}")
 
                 except (OSError, json.JSONDecodeError, KeyError) as e:
-                    logger.warning(f"Failed to load data dictionary from {json_file}: {str(e)}")
+                    logger.warning(
+                        f"Failed to load data dictionary from {json_file}: {str(e)}"
+                    )
                     continue
 
             logger.info(f"Loaded {len(self._data_dictionaries)} data dictionaries")
@@ -413,7 +427,9 @@ class DatabaseClient:
 
         return None
 
-    def get_column_description(self, table_name: str, column_name: str) -> dict[str, Any] | None:
+    def get_column_description(
+        self, table_name: str, column_name: str
+    ) -> dict[str, Any] | None:
         """Get description for a specific column.
 
         Args:
