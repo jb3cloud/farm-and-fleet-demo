@@ -33,7 +33,7 @@ if dotenv.load_dotenv(override=True):
 
 request_settings = AzureChatPromptExecutionSettings(
     function_choice_behavior=FunctionChoiceBehavior.Auto(
-        filters={"excluded_plugins": ["ChatBot"]}
+        maximum_auto_invoke_attempts=15, filters={"excluded_plugins": ["ChatBot"]}
     )
 )
 
@@ -43,40 +43,24 @@ def load_system_prompt() -> str:
     try:
         # Path to the system prompt file (relative to the project root)
         system_prompt_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "prompts/LLM_SYSTEM_PROMPT.md"
+            os.path.dirname(__file__), "prompts/LLM_SYSTEM_PROMPT.md"
         )
 
         with open(system_prompt_path, encoding="utf-8") as f:
             content = f.read()
 
-        # Extract the core system instructions (everything after the first header)
-        lines = content.split("\n")
-        system_prompt_lines = []
-        skip_until_role = True
+            # Add dynamic context about available capabilities
+            dynamic_context = "\n\n## Current Session Context\n"
+            dynamic_context += "- Social Media Data: 1,833 documents with engagement metrics and sentiment analysis\n"
+            dynamic_context += "- Survey Data: 61,787 responses with detailed customer feedback and location data\n"
+            dynamic_context += "- SQL Database: Direct access to structured business data with 5 tables\n"
+            dynamic_context += "- Available Functions: CustomerInsights plugin with 5 core analytical functions\n"
+            dynamic_context += "- Available Functions: DatabaseInsights plugin with 4 core SQL query functions\n"
+            dynamic_context += "- Available Functions: StatisticalAnalytics plugin with 5 predictive analytics functions\n"
+            dynamic_context += "- DateTime plugin available for temporal context\n"
 
-        for line in lines:
-            if skip_until_role and line.strip().startswith("## Your Role"):
-                skip_until_role = False
-                continue
-            elif not skip_until_role:
-                # Include everything after "Your Role" section
-                system_prompt_lines.append(line)
-
-        system_prompt = "\n".join(system_prompt_lines).strip()
-
-        # Add dynamic context about available capabilities
-        dynamic_context = "\n\n## Current Session Context\n"
-        dynamic_context += "- Social Media Data: 1,833 documents with engagement metrics and sentiment analysis\n"
-        dynamic_context += "- Survey Data: 61,787 responses with detailed customer feedback and location data\n"
-        dynamic_context += (
-            "- SQL Database: Direct access to structured business data with 5 tables\n"
-        )
-        dynamic_context += "- Available Functions: CustomerInsights plugin with 5 core analytical functions\n"
-        dynamic_context += "- Available Functions: DatabaseInsights plugin with 4 core SQL query functions\n"
-        dynamic_context += "- Available Functions: StatisticalAnalytics plugin with 5 predictive analytics functions\n"
-        dynamic_context += "- DateTime plugin available for temporal context\n"
-
-        return system_prompt + dynamic_context
+            logger.info("Dynamic context added to system prompt")
+            return content + dynamic_context
 
     except Exception as e:
         logger.warning(f"Failed to load system prompt from file: {str(e)}")
