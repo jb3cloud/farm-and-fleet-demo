@@ -1,0 +1,406 @@
+{
+    "table": {
+        "name": "MEDALLIA_FEEDBACK",
+        "description": "Customer feedback data collected through various channels with AI-enhanced analysis including named entity recognition and opinion mining for friction point identification.",
+        "business_purpose": "Stores customer feedback with transaction context and AI-generated insights to identify customer pain points and areas for operational improvement.",
+        "data_source": "Medallia customer feedback platform with AI text analytics processing"
+    },
+    "columns": {
+        "TRANSACTION_DATE": {
+            "business_meaning": "Timestamp of the original customer transaction (sale, return, etc.).",
+            "usage_notes": "Use for time-series analysis, seasonal patterns, and filtering feedback by transaction date. This is distinct from RESPONSEDATE, which is when the survey was completed."
+        },
+        "STORE": {
+            "business_meaning": "The specific store location where the transaction occurred. The format includes the store name and its branch ID.",
+            "usage_notes": "Use for location-based performance analysis. Format is 'Store Name [ BranchID ]'. The Branch ID can be extracted for joining with other tables."
+        },
+        "BRANCHID": {
+            "business_meaning": "Unique numeric identifier for the store branch.",
+            "usage_notes": "Primary key for joining with store master data. Corresponds to the number in brackets in the STORE column."
+        },
+        "TRANSACTION_TYPE": {
+            "business_meaning": "Classifies the nature of the customer's transaction.",
+            "usage_notes": "Use for segmented analysis of customer experience. Observed values in sample: 'SALE', 'EXCHANGE', 'RETURN'."
+        },
+        "DEPARTMENT": {
+            "business_meaning": "The store department associated with the transaction.",
+            "usage_notes": "Use to analyze feedback specific to departments. Observed values in sample: 'STANDARD', 'AUTO'."
+        },
+        "STORE_NPS": {
+            "business_meaning": "The customer's Net Promoter Score (NPS) rating for the store, indicating their likelihood to recommend.",
+            "usage_notes": "A key satisfaction metric on a scale of 0-10. Promoters (9-10), Passives (7-8), Detractors (0-6)."
+        },
+        "REASON_FOR_LIKELIHOOD_TO_RECOMMEND_SCORE": {
+            "business_meaning": "The customer's open-text explanation for their likelihood to recommend score.",
+            "usage_notes": "Primary source for qualitative analysis. Use for text analytics to understand drivers of NPS. This is a key input for the 'named_entities' and 'mined_opinions' fields."
+        },
+        "STORE_SATISFACTION": {
+            "business_meaning": "Overall customer satisfaction score with the store experience.",
+            "usage_notes": "Numeric rating, typically on a 1-10 scale. Often correlated with STORE_NPS."
+        },
+        "OVERALL_SATISFACTION_WITH_SERVICE": {
+            "business_meaning": "Customer satisfaction score specifically related to the service received.",
+            "usage_notes": "Numeric rating, typically on a 1-10 scale. Useful for analyzing staff performance."
+        },
+        "OVERALL_SATISFACTION_WITH_PRODUCTS": {
+            "business_meaning": "Customer satisfaction score specifically related to the products.",
+            "usage_notes": "Numeric rating, typically on a 1-10 scale. Useful for analyzing product quality and selection."
+        },
+        "FLEX_SURVEY_1": {
+            "business_meaning": "A branching question in the survey that determines if the respondent will answer more detailed questions.",
+            "usage_notes": "Value 'Yes, I would like to continue with the survey' indicates that subsequent detailed feedback columns (e.g., EASE_OF_CHECKOUT, FRIENDLINESS) will be populated. Value 'No, I would like to submit the survey' indicates they will be NULL."
+        },
+        "EASE_OF_CHECKOUT": {
+            "business_meaning": "Customer rating for the ease of the checkout process.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "EASE_OF_FINDING_WHAT_YOU_WERE_LOOKING_FOR": {
+            "business_meaning": "Customer rating for how easy it was to find products.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'. Useful for analyzing store layout and signage."
+        },
+        "APPEARANCE_OF_THE_STORE": {
+            "business_meaning": "Customer rating for the store's appearance and cleanliness.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "STORE_AREAS_OF_IMPROVEMENT": {
+            "business_meaning": "Customer's selection of specific areas needing improvement.",
+            "usage_notes": "Comma-separated string of predefined categories (e.g., 'Restroom,Floor'). Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "OTHER_STORE_IMPROVEMENT_AREA": {
+            "business_meaning": "Open-text field for customers to specify other areas for store improvement.",
+            "usage_notes": "Populated only if 'Other' is selected in STORE_AREAS_OF_IMPROVEMENT. Appears to be NULL in the sample."
+        },
+        "GREETED": {
+            "business_meaning": "Indicates if the customer was greeted upon entering.",
+            "usage_notes": "Categorical response. Observed values: '1' (Yes), '2' (No). Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "RECEIVED_ASSISTANCE": {
+            "business_meaning": "Indicates if the customer received assistance from staff.",
+            "usage_notes": "Categorical response. Observed values: '1' (Yes), '2' (No). Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "FRIENDLINESS": {
+            "business_meaning": "Customer rating of staff friendliness.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "KNOWLEDGE_ABOUT_OUR_PRODUCTS": {
+            "business_meaning": "Customer rating of staff's product knowledge.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "HELPFULNESS": {
+            "business_meaning": "Customer rating of staff helpfulness.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "FIND_ITEM": {
+            "business_meaning": "Indicates if the customer was able to find the item they were looking for.",
+            "usage_notes": "Categorical response. Observed values: '1' (Yes), '2' (No). Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "UNABLE_TO_FIND_ITEM": {
+            "business_meaning": "Reason why a customer was unable to find an item.",
+            "usage_notes": "Categorical response. Observed values: 'Out of Stock', 'Not carried by Blain's'. Populated if FIND_ITEM is '2'."
+        },
+        "OTHER_UNABLE_TO_FIND_ITEMS": {
+            "business_meaning": "Open-text field for other reasons for not finding an item.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "USED_BLAINS_APP": {
+            "business_meaning": "Indicates if the customer used the Blain's mobile app.",
+            "usage_notes": "Boolean-like flag. Observed values: '0' (No), '1' (Yes)."
+        },
+        "SELECTION": {
+            "business_meaning": "Customer rating of the product selection.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "VALUE_FOR_PRICE_PAID": {
+            "business_meaning": "Customer rating of the value for the price paid.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "QUALITY": {
+            "business_meaning": "Customer rating of product quality.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "WHAT_PRODUCT_DOES_THIS_RATING_REFER_TO": {
+            "business_meaning": "Open-text field where customers specify which product their quality rating refers to.",
+            "usage_notes": "Provides context for the QUALITY rating. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "ADDITIONAL_COMMENTS_1": {
+            "business_meaning": "General open-text field for additional customer comments related to the in-store experience.",
+            "usage_notes": "Rich source of qualitative data. Populated only if FLEX_SURVEY_1 is 'Yes'."
+        },
+        "USED_WEBSITE": {
+            "business_meaning": "Indicates if the customer used the website.",
+            "usage_notes": "Boolean-like flag. Observed values: '0' (No), '1' (Yes). Seems related to the online/fulfillment part of the survey."
+        },
+        "NAVIGATION_OR_ABILITY_TO_FIND_PRODUCT_OR_SERVICES": {
+            "business_meaning": "Customer rating of website navigation.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated for website feedback surveys."
+        },
+        "AVAILABILITY_OF_PRODUCTS_OR_SERVICE_APPOINTMENTS": {
+            "business_meaning": "Customer rating of online product/service availability.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated for website feedback surveys."
+        },
+        "CLARITY_OF_PRODUCT_OR_SERVICE_DETAILS": {
+            "business_meaning": "Customer rating of the clarity of product/service details on the website.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated for website feedback surveys."
+        },
+        "IT_WAS_EASY_TO_FIND_INFORMATION_I_NEEDED": {
+            "business_meaning": "Customer rating on the ease of finding information on the website.",
+            "usage_notes": "Numeric rating, typically 1-10. Populated for website feedback surveys."
+        },
+        "EXPERIENCE_ISSUE": {
+            "business_meaning": "Indicates if the customer experienced an issue with the website/online service.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "PLEASE_DESCRIBE_YOUR_ISSUE": {
+            "business_meaning": "Open-text field for describing website/online issues.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "SURVEY_ID": {
+            "business_meaning": "Unique identifier for the survey response.",
+            "usage_notes": "Primary key for the feedback entry itself."
+        },
+        "RESPONSEDATE": {
+            "business_meaning": "Timestamp of when the customer submitted the survey.",
+            "usage_notes": "Distinct from TRANSACTION_DATE. Use to measure the lag between transaction and feedback."
+        },
+        "TRANSACTION_ID": {
+            "business_meaning": "Links feedback to a specific customer purchase or interaction event.",
+            "usage_notes": "Use for joining with transaction tables or grouping feedback by transaction."
+        },
+        "TRANSACTION_AMOUNT": {
+            "business_meaning": "The total monetary value of the transaction. Negative values indicate returns or exchanges.",
+            "usage_notes": "Use for customer value segmentation and correlating spend with satisfaction."
+        },
+        "REGISTER_NUMBER": {
+            "business_meaning": "Identifier for the specific cash register or point-of-sale terminal used.",
+            "usage_notes": "Can be used to identify issues with specific hardware or checkout lanes."
+        },
+        "LOYALTY_NUMBER": {
+            "business_meaning": "Unique identifier for the customer's loyalty program account.",
+            "usage_notes": "Links feedback to specific customer profiles for personalized insights and journey analysis."
+        },
+        "NUMBER_OF_ITEMS_PURCHASED": {
+            "business_meaning": "The total count of items in the transaction. Negative values indicate returns.",
+            "usage_notes": "Useful for analyzing basket size in relation to customer satisfaction."
+        },
+        "CART_SPEND_AMOUNT": {
+            "business_meaning": "Seems redundant with TRANSACTION_AMOUNT.",
+            "usage_notes": "Observed as NULL in the sample. May be used in different contexts not present in the sample."
+        },
+        "LANGUAGE": {
+            "business_meaning": "The language in which the survey was taken.",
+            "usage_notes": "Observed value: 'English'."
+        },
+        "COUNTRY": {
+            "business_meaning": "The country where the transaction occurred.",
+            "usage_notes": "Observed value: 'US'."
+        },
+        "PROMOTION_TYPE": {
+            "business_meaning": "The type of promotion, if any, applied to the transaction.",
+            "usage_notes": "Appears to be NULL in the sample data. Could be used to measure promotion effectiveness."
+        },
+        "CUSTOMER_TIER": {
+            "business_meaning": "The customer's tier within the loyalty program.",
+            "usage_notes": "Appears to be NULL in the sample data. Could be used for segmenting feedback by customer value."
+        },
+        "CUSTOMER_TYPE": {
+            "business_meaning": "Categorization of the customer, likely by gender.",
+            "usage_notes": "Observed values: 'F' (Female), 'M' (Male), 'U' (Unknown). Inferred from context."
+        },
+        "ASSOCIATE_ID": {
+            "business_meaning": "Identifier for the associate who handled the transaction.",
+            "usage_notes": "Appears to be NULL in the sample data. If populated, could be used for associate-level performance feedback."
+        },
+        "SURVEY_TYPE": {
+            "business_meaning": "The primary channel or context of the survey.",
+            "usage_notes": "Distinguishes between different feedback types. Observed values: 'STANDARD', 'AUTO'."
+        },
+        "CUSTOM_FIELD_2": {
+            "business_meaning": "A generic custom field for additional data.",
+            "usage_notes": "Appears to be NULL in the sample data. Purpose is not evident."
+        },
+        "FULFILLMENT_NPS": {
+            "business_meaning": "NPS score related to order fulfillment (e.g., online orders, delivery).",
+            "usage_notes": "Appears to be NULL in the sample data. Populated for fulfillment-related surveys."
+        },
+        "REASON_FOR_SCORE": {
+            "business_meaning": "Open-text reason for the fulfillment NPS score.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "ORDER_RECEIVED": {
+            "business_meaning": "Customer rating on receiving their order.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "ORDER_SATISFACTION": {
+            "business_meaning": "Overall satisfaction with the order fulfillment.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "FLEX_SURVEY_2": {
+            "business_meaning": "A secondary branching question, likely for fulfillment surveys.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "ON_TIME": {
+            "business_meaning": "Customer rating on whether the order was on time.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "ORDER_TRACKING_OR_STATUS_INFORMATION": {
+            "business_meaning": "Customer rating of order tracking information.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "PRODUCT_CONDITION": {
+            "business_meaning": "Customer rating of the product's condition upon arrival.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "PRODUCT_PACKAGING": {
+            "business_meaning": "Customer rating of the product's packaging.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "DELIVERY_COMPANY": {
+            "business_meaning": "Customer rating of the delivery company.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "ORDER_ACCURATE": {
+            "business_meaning": "Customer rating on the accuracy of the order.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "CONTACT_SUPPORT": {
+            "business_meaning": "Indicates if the customer contacted support for the order.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "ADDITIONAL_COMMENTS_2": {
+            "business_meaning": "General open-text field for comments related to fulfillment.",
+            "usage_notes": "Appears to be NULL in the sample data."
+        },
+        "LIKE_TO_BE_CONTACTED_FULFILLMENT": {
+            "business_meaning": "Indicates if the customer wants to be contacted about their fulfillment experience.",
+            "usage_notes": "Categorical response. Observed values include 'Yes' and 'No'."
+        },
+        "DID_YOU_CALL_TO_SCHEDULE_YOUR_APPOINTMENT": {
+            "business_meaning": "A branching question for AUTO service surveys.",
+            "usage_notes": "Determines which follow-up questions are asked. Observed values: 'Yes', 'No, I visited the store or used the website tool to schedule.\\n'."
+        },
+        "HOW_SATISFIED_ARE_YOU_WITH_THE_ASSISTANCE_OF_THE_ASSOCIATES_IN_THIS_STORE": {
+            "business_meaning": "Overall satisfaction rating for associate assistance.",
+            "usage_notes": "Numeric rating, typically 1-10. This question appears to be a consolidated rating asked in some survey paths."
+        },
+        "MY_CALL_WAS_ANSWERED_IN_A_TIMELY_MANNER": {
+            "business_meaning": "Rating for call answer timeliness for AUTO service appointments.",
+            "usage_notes": "Numeric rating, typically 1-5. Populated if 'DID_YOU_CALL_TO_SCHEDULE_YOUR_APPOINTMENT' is 'Yes'."
+        },
+        "THE_ASSOCIATE_WAS_ABLE_TO_HELP_WITH_MY_REQUEST": {
+            "business_meaning": "Rating for request resolution over the phone for AUTO service.",
+            "usage_notes": "Numeric rating, typically 1-5. Populated if 'DID_YOU_CALL_TO_SCHEDULE_YOUR_APPOINTMENT' is 'Yes'."
+        },
+        "THE_ASSOCIATE_WAS_KNOWLEDGEABLE_AND_FRIENDLY": {
+            "business_meaning": "Rating for associate knowledge and friendliness over the phone for AUTO service.",
+            "usage_notes": "Numeric rating, typically 1-5. Populated if 'DID_YOU_CALL_TO_SCHEDULE_YOUR_APPOINTMENT' is 'Yes'."
+        },
+        "SURVEY_STATUS": {
+            "business_meaning": "The processing status of the survey response.",
+            "usage_notes": "Observed values: 'COMPLETED', 'EXCLUDED'. 'EXCLUDED' may indicate the response was filtered out for quality or other reasons."
+        },
+        "named_entities": {
+            "business_meaning": "Structured extraction of key business entities mentioned by customers (products, departments, services, etc.) from free-text fields.",
+            "usage_notes": "Use OPENJSON to expand array elements. This field is generated by an AI model to structure unstructured text for easier analysis.",
+            "json_structure": {
+                "type": "array",
+                "items": {
+                    "text": "The actual text mention",
+                    "category": "Entity category (e.g., 'Product', 'PersonType', 'Location', 'Organization', 'Skill')",
+                    "subcategory": "A more specific category (e.g., 'City', 'Duration'). Often null.",
+                    "confidence_score": "AI confidence score (0.0 to 1.0)",
+                    "offset": "Character offset of the entity in the source text.",
+                    "length": "Character length of the entity."
+                }
+            }
+        },
+        "mined_opinions": {
+            "business_meaning": "Structured analysis of customer sentiments towards specific targets mentioned in their feedback.",
+            "usage_notes": "Primary source for targeted sentiment analysis. Use OPENJSON to extract targets and their associated sentiment scores. This field is generated by an AI model.",
+            "json_structure": {
+                "type": "array",
+                "items": {
+                    "target_text": "The aspect of experience being discussed (e.g., 'staff', 'checkout', 'prices')",
+                    "target_sentiment": "Overall sentiment polarity for the target (positive, negative, neutral)",
+                    "target_positive_score": "Confidence score for positive sentiment (0.0 to 1.0)",
+                    "target_negative_score": "Confidence score for negative sentiment (0.0 to 1.0)",
+                    "assessments": {
+                        "type": "array",
+                        "items": {
+                            "text": "The specific opinion text used to judge the target (e.g., 'helpful', 'rude')",
+                            "sentiment": "Sentiment of the specific opinion text",
+                            "positive_score": "Confidence score for positive sentiment (0.0 to 1.0)",
+                            "negative_score": "Confidence score for negative sentiment (0.0 to 1.0)"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "relationships": {
+        "store_locations": {
+            "description": "Links to store/location master data via STORE and BRANCHID",
+            "related_tables": ["stores", "locations", "branches"],
+            "join_keys": ["STORE", "BRANCHID"]
+        }
+    },
+    "analysis_patterns": {
+        "friction_point_analysis": {
+            "description": "Identify customer pain points from negative opinions",
+            "key_columns": [
+                "mined_opinions",
+                "REASON_FOR_LIKELIHOOD_TO_RECOMMEND_SCORE"
+            ],
+            "query_approach": "Extract negative sentiment opinions and group by target_text"
+        },
+        "entity_based_insights": {
+            "description": "Analyze customer mentions of specific products, services, or departments",
+            "key_columns": ["named_entities"],
+            "query_approach": "Group entity mentions by category and frequency"
+        },
+        "temporal_satisfaction_trends": {
+            "description": "Track satisfaction patterns over time",
+            "key_columns": ["TRANSACTION_DATE", "RESPONSEDATE", "STORE_NPS"],
+            "query_approach": "Aggregate satisfaction metrics by time periods (e.g., monthly, quarterly)"
+        },
+        "location_performance": {
+            "description": "Compare customer experience across different stores/locations",
+            "key_columns": ["STORE", "BRANCHID", "STORE_NPS", "mined_opinions"],
+            "query_approach": "Aggregate satisfaction metrics by location"
+        },
+        "survey_branching_impact": {
+            "description": "Analyze how responses to branching questions (like FLEX_SURVEY_1) correlate with overall satisfaction.",
+            "key_columns": ["FLEX_SURVEY_1", "STORE_NPS"],
+            "query_approach": "Group by FLEX_SURVEY_1 and calculate average NPS to see if customers who continue the survey are more or less satisfied."
+        }
+    },
+    "query_performance_tips": {
+        "json_indexing": "Consider computed columns for frequently queried JSON properties, such as sentiment or entity category, and index them.",
+        "date_partitioning": "Use TRANSACTION_DATE or RESPONSEDATE for partition pruning in large datasets.",
+        "text_search": "Use full-text search for analyzing REASON_FOR_LIKELIHOOD_TO_RECOMMEND_SCORE and other comment fields.",
+        "json_performance": "JSON_VALUE is generally faster than OPENJSON for single value extraction. Use OPENJSON when you need to shred the array into rows."
+    },
+    "specialized_patterns": {
+        "named_entities_analysis": {
+            "description": "Extract and analyze named entities from JSON arrays",
+            "examples": [
+                "-- Get all entity categories\nSELECT DISTINCT JSON_VALUE(ne.value, '$.category') as category\nFROM MEDALLIA_FEEDBACK \nCROSS APPLY OPENJSON(named_entities) as ne",
+                "-- Count entities by category\nSELECT JSON_VALUE(ne.value, '$.category') as category, COUNT(*) as count\nFROM MEDALLIA_FEEDBACK \nCROSS APPLY OPENJSON(named_entities) as ne\nGROUP BY JSON_VALUE(ne.value, '$.category')",
+                "-- Find product mentions\nSELECT TRANSACTION_ID, JSON_VALUE(ne.value, '$.text') as product_mention\nFROM MEDALLIA_FEEDBACK \nCROSS APPLY OPENJSON(named_entities) as ne\nWHERE JSON_VALUE(ne.value, '$.category') = 'Product'"
+            ]
+        },
+        "mined_opinions_analysis": {
+            "description": "Analyze friction points from mined opinions",
+            "examples": [
+                "-- Count negative sentiments by target\nSELECT JSON_VALUE(op.value, '$.target_text') as target, COUNT(*) as negative_count\nFROM MEDALLIA_FEEDBACK \nCROSS APPLY OPENJSON(mined_opinions) as op\nWHERE JSON_VALUE(op.value, '$.target_sentiment') = 'negative'\nGROUP BY JSON_VALUE(op.value, '$.target_text')\nORDER BY negative_count DESC",
+                "-- Sentiments by store location\nSELECT STORE, JSON_VALUE(op.value, '$.target_text') as target_text, JSON_VALUE(op.value, '$.target_sentiment') as sentiment, COUNT(*) as occurrence_count\nFROM MEDALLIA_FEEDBACK \nCROSS APPLY OPENJSON(mined_opinions) as op\nGROUP BY STORE, JSON_VALUE(op.value, '$.target_text'), JSON_VALUE(op.value, '$.target_sentiment')\nORDER BY STORE, occurrence_count DESC"
+            ]
+        },
+        "sentiment_trend_analysis": {
+            "description": "Analyze sentiment trends over time and by location",
+            "examples": [
+                "-- Monthly NPS trend\nSELECT \n  YEAR(TRANSACTION_DATE) as year,\n  MONTH(TRANSACTION_DATE) as month,\n  AVG(CAST(STORE_NPS AS FLOAT)) as avg_nps\nFROM MEDALLIA_FEEDBACK \nWHERE STORE_NPS IS NOT NULL\nGROUP BY YEAR(TRANSACTION_DATE), MONTH(TRANSACTION_DATE)\nORDER BY year, month",
+                "-- Store NPS comparison\nSELECT \n  STORE,\n  COUNT(*) as response_count,\n  AVG(CAST(STORE_NPS AS FLOAT)) as avg_nps\nFROM MEDALLIA_FEEDBACK\nWHERE STORE_NPS IS NOT NULL\nGROUP BY STORE\nORDER BY avg_nps DESC"
+            ]
+        }
+    }
+}

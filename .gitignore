@@ -157,9 +157,6 @@ Thumbs.db
 .chainlit/
 
 # Data files (exclude sensitive data)
-*.csv
-*.xlsx
-*.json
 source_data/
 
 # Environment variables
