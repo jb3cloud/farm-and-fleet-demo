@@ -4,6 +4,7 @@ import logging
 import os
 import traceback
 from datetime import UTC, datetime
+from typing import Annotated
 
 import chainlit as cl
 import dotenv
@@ -88,6 +89,19 @@ class DateTimePlugin:
         return datetime.now(UTC).isoformat()
 
 
+class CodeExecutionPlugin:
+    @kernel_function(name="execute_code", description="Executes simple Python code")
+    def execute_code(
+        self, code: Annotated[str, "Simple python code to execute using exec()"]
+    ) -> str:
+        """Executes Python code."""
+        try:
+            exec(code)
+            return "Code executed successfully."
+        except Exception as e:
+            return f"Error executing code: {str(e)}"
+
+
 @cl.on_chat_start
 async def on_chat_start() -> None:
     try:
@@ -154,6 +168,10 @@ async def on_chat_start() -> None:
         # Import the WeatherPlugin
         logger.info("Adding WeatherPlugin...")
         kernel.add_plugin(DateTimePlugin(), plugin_name="DateTime")
+
+        # Import the CodeExecutionPlugin
+        logger.info("Adding CodeExecutionPlugin...")
+        kernel.add_plugin(CodeExecutionPlugin(), plugin_name="CodeExecution")
 
         # Add the FrictionPointSearchPlugin for customer feedback analysis
         logger.info("Adding FrictionPointSearchPlugin...")

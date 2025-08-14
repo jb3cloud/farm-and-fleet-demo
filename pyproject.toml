@@ -10,6 +10,7 @@ dependencies = [
     "azure-search-documents==11.5.3",
     "chainlit>=2.6.8",
     "networkx>=3.5",
+    "numpy>=1.26.4",
     "openai>=1.0.0",
     "pandas>=2.3.1",
     "pandas-stubs>=2.3.0.250703",
