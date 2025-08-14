@@ -141,6 +141,9 @@ cython_debug/
 # uv
 .uv-cache/
 
+# ruff
+.ruff_cache/
+
 # Azure
 .azure/
 
@@ -162,3 +165,6 @@ source_data/
 # Environment variables
 .env.*
 !.env.example
+
+# Local settings
+*.local.json
