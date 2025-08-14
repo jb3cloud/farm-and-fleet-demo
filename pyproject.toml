@@ -1,0 +1,110 @@
+[project]
+name = "farmandfleet"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "azure-ai-textanalytics==5.3.0",
+    "azure-core>=1.35.0",
+    "azure-search-documents==11.5.3",
+    "chainlit>=2.6.8",
+    "networkx>=3.5",
+    "openai>=1.0.0",
+    "pandas>=2.3.1",
+    "pandas-stubs>=2.3.0.250703",
+    "pydantic>=2.11.7",
+    "pyodbc>=5.2.0",
+    "python-dotenv>=1.1.1",
+    "rich>=13.0.0",
+    "semantic-kernel[mcp]>=1.35.2",
+    "sqlalchemy>=2.0.43",
+    "types-networkx>=3.5.0.20250812",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.31.1",
+    "ruff>=0.12.7",
+]
+
+[tool.basedpyright]
+# Type checking configuration
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+pythonPlatform = "All"
+
+# Include and exclude patterns
+include = ["scripts", "src"]
+exclude = [
+    "**/cache/**",
+    "**/data/**",
+    "**/.venv/**",
+    "**/venv/**",
+    "**/__pycache__/**",
+]
+
+# Ignore routine warnings from external libraries
+reportUnknownParameterType = false
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportAny = false
+reportMissingTypeStubs = false
+reportUnnecessaryIsInstance = false
+reportIncompatibleMethodOverride = false
+reportImplicitStringConcatenation = false
+reportCallInDefaultInitializer = false
+reportPropertyTypeMismatch = false
+reportUninitializedInstanceVariable = false
+
+# Keep important type checking enabled
+reportMissingImports = true
+reportMissingTypeArgument = true
+reportInvalidTypeVarUse = true
+reportFunctionMemberAccess = true
+reportOptionalMemberAccess = true
+reportOptionalOperand = true
+reportOptionalIterable = true
+reportOptionalContextManager = true
+reportOptionalCall = true
+reportUntypedFunctionDecorator = true
+reportUntypedClassDecorator = true
+reportUntypedBaseClass = true
+reportUntypedNamedTuple = true
+reportAssertAlwaysTrue = true
+reportSelfClsParameterName = true
+reportImplicitOverride = true
+reportInvalidStubStatement = true
+reportIncompleteStub = true
+reportUnsupportedDunderAll = true
+
+# Performance and output settings
+useLibraryCodeForTypes = true
+verboseOutput = false
+
+[tool.ruff]
+# Ruff configuration for code formatting and linting
+target-version = "py311"
+line-length = 88
+exclude = ["cache", "data", ".venv", "venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "T20", # flake8-print
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+    "T201", # print statements allowed for this project
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
