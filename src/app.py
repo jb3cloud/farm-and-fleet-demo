@@ -27,11 +27,17 @@ from pydantic_ai.messages import (
     FinalResultEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
+    SystemPromptPart,
+    TextPart,
     TextPartDelta,
     ThinkingPartDelta,
     ToolCallPartDelta,
+    UserPromptPart,
 )
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.azure import AzureProvider
@@ -108,15 +114,72 @@ def load_system_prompt() -> str:
         return "You are a helpful AI assistant for Farm & Fleet customer insights analysis."
 
 
-async def run_agent_with_steps(
+def convert_chainlit_to_pydantic_messages(
+    chainlit_messages: list[dict[str, str]],
+) -> list[ModelMessage]:
+    """
+    Convert Chainlit's OpenAI format messages to PydanticAI ModelMessage format.
+
+    This function bridges the gap between Chainlit's chat history format and PydanticAI's
+    message format, enabling conversation continuity by passing chat history to PydanticAI agents.
+
+    Message Mapping:
+    - "system" -> ModelRequest with SystemPromptPart
+    - "user" -> ModelRequest with UserPromptPart
+    - "assistant" -> ModelResponse with TextPart
+
+    Example:
+        chainlit_msgs = cl.chat_context.to_openai()
+        pydantic_msgs = convert_chainlit_to_pydantic_messages(chainlit_msgs)
+        result = agent.run(message_history=pydantic_msgs, ...)
+
+    Args:
+        chainlit_messages: List of dict with 'role' and 'content' keys from cl.chat_context.to_openai()
+
+    Returns:
+        List of ModelMessage objects compatible with PydanticAI's message_history parameter
+    """
+    pydantic_messages: list[ModelMessage] = []
+
+    for msg in chainlit_messages:
+        role = msg.get("role")
+        content = msg.get("content", "")
+
+        if role == "system":
+            # System messages become ModelRequest with SystemPromptPart
+            pydantic_messages.append(
+                ModelRequest(parts=[SystemPromptPart(content=content)])
+            )
+        elif role == "user":
+            # User messages become ModelRequest with UserPromptPart
+            pydantic_messages.append(
+                ModelRequest(parts=[UserPromptPart(content=content)])
+            )
+        elif role == "assistant":
+            # Assistant messages become ModelResponse with TextPart
+            pydantic_messages.append(ModelResponse(parts=[TextPart(content=content)]))
+        # Note: We ignore other roles or handle them as needed
+
+    return pydantic_messages
+
+
+async def run_agent(
     agent: Agent[AppDependencies, str],
-    prompt: str,
+    message_history: list[ModelMessage],
     deps: AppDependencies,
 ) -> None:
     """
-    Run PydanticAI agent and handle tool Steps sequentially like cl.step decorator.
+    Run PydanticAI agent with message history and handle tool Steps sequentially like cl.step decorator.
+
+    Args:
+        agent: The PydanticAI agent instance
+        message_history: List of ModelMessage objects representing the conversation history
+        deps: AppDependencies container with initialized clients
     """
-    async with agent.iter(prompt, deps=deps) as run:
+    async with agent.iter(
+        message_history=message_history,
+        deps=deps,
+    ) as run:
         async for node in run:
             if Agent.is_user_prompt_node(node):
                 # A user prompt node => The user has provided input
@@ -174,6 +237,9 @@ async def run_agent_with_steps(
                             logger.info(
                                 f"[Tools] Tool call {event.tool_call_id!r} returned => {event.result.content}"
                             )
+                        else:
+                            logger.warning(f"[Tools] Unhandled Event: {event}")
+
             elif Agent.is_end_node(node):
                 # Once an End node is reached, the agent run is complete
                 assert run.result is not None
@@ -1710,11 +1776,15 @@ async def on_message(message: cl.Message) -> None:
             ).send()
             return
 
-        logger.info(f"Processing message: {message.content[:50]}...")
-
-        # Use working non-streaming approach with proper Step ordering
         try:
-            await run_agent_with_steps(agent, message.content, deps)
+            # Get chat history from Chainlit and convert to PydanticAI format
+            chainlit_history = cl.chat_context.to_openai()
+            # Add the current message to the history
+            chainlit_history.append({"role": "user", "content": message.content})
+            # Convert to PydanticAI format
+            pydantic_messages = convert_chainlit_to_pydantic_messages(chainlit_history)
+
+            await run_agent(agent, pydantic_messages, deps)
 
         except Exception as e:
             logger.error(f"Agent run failed: {str(e)}")
