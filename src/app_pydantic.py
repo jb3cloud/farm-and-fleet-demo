@@ -17,7 +17,7 @@ import traceback
 from contextlib import redirect_stdout
 from datetime import UTC, datetime
 from io import StringIO
-from typing import Annotated
+from typing import Annotated, Any
 
 import chainlit as cl
 import dotenv
@@ -877,14 +877,19 @@ def register_database_tools(agent: Agent[AppDependencies, str]) -> None:
         order_by: Annotated[
             str, "Optional ORDER BY clause (without 'ORDER BY' keyword)"
         ] = "",
+        offset: Annotated[int, "Number of rows to skip for pagination (0-based)"] = 0,
     ) -> str:
-        """Query data from a specific table with optional filtering and ordering."""
+        """Query data from a specific table with optional filtering, ordering, and pagination.
+
+        Returns structured data with pagination metadata including total count and navigation info.
+        Use offset parameter to paginate through large result sets.
+        """
         async with cl.Step(
             type="tool",
             name="Query Table Data",
             language="json",
         ) as step:
-            step.input = f"Table: {table_name} (max: {max_rows} rows)"
+            step.input = f"Table: {table_name} (max: {max_rows} rows, offset: {offset})"
 
             if not ctx.deps.database_client:
                 raise ModelRetry(
@@ -892,12 +897,30 @@ def register_database_tools(agent: Agent[AppDependencies, str]) -> None:
                 )
 
             try:
-                # Validate and clamp max_rows
+                # Validate and clamp parameters
                 max_rows = max(1, min(max_rows, 100))
+                offset = max(0, offset)
 
-                # Execute table query - simplified implementation
                 schema = getattr(ctx.deps.database_client, "schema", "dbo")
-                query_parts = [f"SELECT TOP {max_rows}"]
+
+                # First, get total count for pagination metadata
+                count_query_parts = ["SELECT COUNT(*) as total_count"]
+                count_query_parts.append(f"FROM [{schema}].[{table_name}]")
+
+                if where_clause.strip():
+                    count_query_parts.append(f"WHERE {where_clause}")
+
+                count_query = " ".join(count_query_parts)
+                count_result = ctx.deps.database_client.execute_query(
+                    count_query, max_rows=1
+                )
+
+                total_count = 0
+                if count_result.get("results"):
+                    total_count = count_result["results"][0].get("total_count", 0)
+
+                # Build main query with pagination
+                query_parts = ["SELECT"]
 
                 if columns == "*":
                     query_parts.append("*")
@@ -909,30 +932,51 @@ def register_database_tools(agent: Agent[AppDependencies, str]) -> None:
                 if where_clause.strip():
                     query_parts.append(f"WHERE {where_clause}")
 
+                # For pagination, we need ORDER BY
                 if order_by.strip():
                     query_parts.append(f"ORDER BY {order_by}")
+                else:
+                    # Default ordering by first column for consistent pagination
+                    query_parts.append("ORDER BY (SELECT NULL)")
+
+                # Add pagination clause
+                query_parts.append(
+                    f"OFFSET {offset} ROWS FETCH NEXT {max_rows} ROWS ONLY"
+                )
 
                 query_sql = " ".join(query_parts)
                 results = ctx.deps.database_client.execute_query(
                     query_sql, max_rows=max_rows
                 )
 
+                # Calculate pagination metadata
+                returned_count = len(results.get("results", []))
+                has_more = (offset + returned_count) < total_count
+
                 # Format response for LLM consumption
                 response = {
-                    "table_name": table_name,
-                    "max_rows": max_rows,
-                    "columns_requested": columns,
-                    "where_clause": where_clause,
-                    "order_by": order_by,
-                    "row_count": len(results.get("results", [])),
                     "data": results.get("results", []),
+                    "metadata": {
+                        "table_name": table_name,
+                        "total_count": total_count,
+                        "returned_count": returned_count,
+                        "has_more": has_more,
+                        "offset": offset,
+                        "limit": max_rows,
+                        "next_offset": offset + max_rows if has_more else None,
+                    },
+                    "query_info": {
+                        "columns_requested": columns,
+                        "where_clause": where_clause,
+                        "order_by": order_by,
+                    },
                 }
 
                 if "error" in results:
                     response["error"] = results["error"]
                     step.output = f"Error in table query: {results['error']}"
                 else:
-                    step.output = f"Retrieved {len(results.get('results', []))} rows from {table_name}"
+                    step.output = f"Retrieved {returned_count} of {total_count} rows from {table_name} (offset: {offset})"
 
                 return json.dumps(response, indent=2)
 
@@ -941,8 +985,11 @@ def register_database_tools(agent: Agent[AppDependencies, str]) -> None:
                 error_result = json.dumps(
                     {
                         "error": f"Table query failed: {str(e)}",
-                        "table_name": table_name,
-                        "max_rows": max_rows,
+                        "metadata": {
+                            "table_name": table_name,
+                            "limit": max_rows,
+                            "offset": offset,
+                        },
                     }
                 )
                 step.output = f"Error: {str(e)}"
@@ -1033,13 +1080,18 @@ def register_database_tools(agent: Agent[AppDependencies, str]) -> None:
         ctx: RunContext[AppDependencies],
         sql_query: Annotated[str, "T-SQL query to execute (SELECT statements only)"],
         max_rows: Annotated[int, "Maximum rows to return (1-1000)"] = 100,
+        offset: Annotated[int, "Number of rows to skip for pagination (0-based)"] = 0,
         explain_plan: Annotated[bool, "Include query execution plan"] = False,
     ) -> str:
-        """Execute a custom T-SQL query for complex business analysis."""
+        """Execute a custom T-SQL query for complex business analysis with pagination support.
+
+        For queries with ORDER BY clauses, pagination will be automatically applied.
+        Returns structured data with pagination metadata when applicable.
+        """
         async with cl.Step(
             type="tool", name="Execute SQL Query", show_input="sql", language="json"
         ) as step:
-            step.input = sql_query
+            step.input = f"{sql_query}\n-- Max rows: {max_rows}, Offset: {offset}"
 
             if not ctx.deps.database_client:
                 raise ModelRetry(
@@ -1047,27 +1099,101 @@ def register_database_tools(agent: Agent[AppDependencies, str]) -> None:
                 )
 
             try:
-                # Validate and clamp max_rows
+                # Validate and clamp parameters
                 max_rows = max(1, min(max_rows, 1000))
+                offset = max(0, offset)
 
-                # Execute SQL query
+                # Check if query has ORDER BY for pagination support
+                sql_upper = sql_query.upper().strip()
+                has_order_by = "ORDER BY" in sql_upper
+                is_pageable = has_order_by and offset > 0
+
+                # Modify query for pagination if applicable
+                final_query = sql_query
+                total_count = None
+
+                if has_order_by and offset > 0:
+                    # Add pagination to existing ORDER BY query
+                    if not sql_query.rstrip().endswith(";"):
+                        final_query = sql_query.rstrip()
+                    else:
+                        final_query = sql_query.rstrip()[
+                            :-1
+                        ]  # Remove trailing semicolon
+
+                    final_query += (
+                        f" OFFSET {offset} ROWS FETCH NEXT {max_rows} ROWS ONLY"
+                    )
+
+                    # Try to get total count by wrapping original query
+                    try:
+                        # Remove ORDER BY for count query
+                        base_query = sql_query
+                        order_by_pos = base_query.upper().rfind("ORDER BY")
+                        if order_by_pos > 0:
+                            base_query = base_query[:order_by_pos].strip()
+
+                        count_query = f"SELECT COUNT(*) as total_count FROM ({base_query}) as count_subquery"
+                        count_result = ctx.deps.database_client.execute_query(
+                            count_query, max_rows=1
+                        )
+
+                        if count_result.get("results"):
+                            total_count = count_result["results"][0].get(
+                                "total_count", None
+                            )
+                    except Exception:
+                        # If count query fails, continue without total count
+                        pass
+
+                # Execute the final query
                 results = ctx.deps.database_client.execute_query(
-                    query=sql_query, max_rows=max_rows
+                    query=final_query, max_rows=max_rows
                 )
 
+                # Calculate pagination metadata
+                returned_count = len(results.get("results", []))
+                has_more = None
+                if total_count is not None:
+                    has_more = (offset + returned_count) < total_count
+
                 # Format response for LLM consumption
-                response = {
-                    "sql_query": sql_query,
-                    "max_rows": max_rows,
-                    "explain_plan": explain_plan,
-                    "row_count": len(results.get("results", [])),
-                    "results": results,
+                metadata_dict: dict[str, Any] = {
+                    "returned_count": returned_count,
+                    "offset": offset,
+                    "limit": max_rows,
+                    "is_pageable": is_pageable,
+                    "has_order_by": has_order_by,
                 }
+
+                # Add pagination metadata if available
+                if total_count is not None:
+                    metadata_dict["total_count"] = total_count
+                    if has_more is not None:
+                        metadata_dict["has_more"] = has_more
+                    if has_more:
+                        metadata_dict["next_offset"] = offset + max_rows
+
+                response = {
+                    "data": results.get("results", []),
+                    "metadata": metadata_dict,
+                    "query_info": {
+                        "original_query": sql_query,
+                        "executed_query": final_query,
+                        "explain_plan": explain_plan,
+                    },
+                }
+
+                # Include original results structure for backward compatibility
+                response["results"] = results
 
                 if "error" in results:
                     step.output = f"Error in SQL query: {results['error']}"
                 else:
-                    step.output = f"Query executed successfully, returned {len(results.get('results', []))} rows"
+                    if total_count is not None:
+                        step.output = f"Query executed successfully, returned {returned_count} of {total_count} rows (offset: {offset})"
+                    else:
+                        step.output = f"Query executed successfully, returned {returned_count} rows (offset: {offset})"
 
                 return json.dumps(response, indent=2)
 
@@ -1076,8 +1202,13 @@ def register_database_tools(agent: Agent[AppDependencies, str]) -> None:
                 error_result = json.dumps(
                     {
                         "error": f"SQL query failed: {str(e)}",
-                        "sql_query": sql_query,
-                        "max_rows": max_rows,
+                        "query_info": {
+                            "sql_query": sql_query,
+                        },
+                        "metadata": {
+                            "limit": max_rows,
+                            "offset": offset,
+                        },
                     }
                 )
                 step.output = f"Error: {str(e)}"

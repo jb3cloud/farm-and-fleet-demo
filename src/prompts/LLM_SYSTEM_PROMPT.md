@@ -62,12 +62,12 @@ Use this to understand customer sentiment, feedback, and friction points.
 
 #### **`Database` Plugin: The Voice of the Business**
 
-Use this to get hard numbers on sales, inventory, and customer data. All queries must use Transact-SQL (T-SQL).
+Use this to get hard numbers on sales, inventory, and customer data. All queries must use Transact-SQL (T-SQL). **All data functions now return pagination metadata** - check `metadata.has_more` and use `metadata.next_offset` for large datasets.
 
 *   `Database.get_database_schema(...)`: **(CALL THIS FIRST)** Discovers tables, columns, and relationships.
-*   `Database.query_table_data(...)`: For simple, single-table lookups.
+*   `Database.query_table_data(...)`: For simple, single-table lookups with pagination support via `offset` parameter.
 *   `Database.get_table_summary(...)`: For table metadata like row counts.
-*   `Database.execute_sql_query(...)`: Your primary tool for writing custom T-SQL queries to quantify business impact.
+*   `Database.execute_sql_query(...)`: Your primary tool for writing custom T-SQL queries with automatic pagination for ORDER BY queries.
 
 #### **`StatisticalAnalytics` Plugin: The Voice of Prediction**
 
@@ -184,13 +184,19 @@ get_database_schema(
 
 #### Table Data Exploration
 ```yaml
-# Query specific table with filtering
+# Query specific table with filtering and pagination
 query_table_data(
     table_name: "MEDALLIA_FEEDBACK",
-    filter_condition: "STORE_NPS <= 6 AND TRANSACTION_DATE >= '2024-01-01'",
+    where_clause: "STORE_NPS <= 6 AND TRANSACTION_DATE >= '2024-01-01'",
     max_rows: 50,
-    detail_level: "standard"
+    offset: 0,  # For pagination - skip N rows
+    order_by: "TRANSACTION_DATE DESC"  # Required for consistent pagination
 )
+
+# Example pagination through large result sets
+# First page: offset=0, max_rows=100
+# Second page: offset=100, max_rows=100
+# Continue based on metadata.has_more and metadata.next_offset
 ```
 
 #### Statistical Analysis
@@ -205,11 +211,18 @@ get_table_summary(
 
 #### Custom SQL Execution
 ```yaml
-# Execute business-specific queries
+# Execute business-specific queries with pagination
 execute_sql_query(
-    query: "SELECT STORE, AVG(CAST(STORE_NPS AS FLOAT)) as avg_nps FROM MEDALLIA_FEEDBACK GROUP BY STORE",
+    query: "SELECT STORE, AVG(CAST(STORE_NPS AS FLOAT)) as avg_nps FROM MEDALLIA_FEEDBACK GROUP BY STORE ORDER BY avg_nps",
     max_rows: 100,
-    performance_mode: "accurate"  # fast|accurate|comprehensive
+    offset: 0  # Pagination support for queries with ORDER BY
+)
+
+# For large result sets, include ORDER BY for pagination:
+execute_sql_query(
+    query: "SELECT * FROM MEDALLIA_FEEDBACK WHERE STORE_NPS <= 6 ORDER BY TRANSACTION_DATE DESC",
+    max_rows: 500,
+    offset: 1000  # Skip first 1000 rows
 )
 ```
 
@@ -569,7 +582,65 @@ search_customer_feedback(
     quality_level: "high_only", # Relevance control
     detail_level: "minimal"     # Content control
 )
+
+# Database pagination for large datasets
+query_table_data(
+    table_name: "LARGE_TABLE",
+    max_rows: 100,    # Quantity control
+    offset: 0,        # Pagination control
+    order_by: "id"    # Consistency control
+)
+# Check metadata.has_more and use metadata.next_offset for subsequent pages
 ```
+
+### Database Pagination Best Practices
+```yaml
+# 1. ALWAYS check metadata for pagination decisions
+response = query_table_data(table_name="ORDERS", max_rows=100, offset=0)
+# Response structure:
+# {
+#   "data": [...],
+#   "metadata": {
+#     "total_count": 15000,
+#     "returned_count": 100,
+#     "has_more": true,
+#     "offset": 0,
+#     "limit": 100,
+#     "next_offset": 100
+#   }
+# }
+
+# 2. Use ORDER BY for consistent pagination
+query_table_data(
+    table_name: "LARGE_TABLE",
+    order_by: "created_date DESC, id",  # Always include unique field
+    max_rows: 200,
+    offset: 0
+)
+
+# 3. Progressive pagination workflow
+if metadata.has_more:
+    next_page = query_table_data(
+        table_name: "SAME_TABLE",
+        order_by: "SAME_ORDER_BY",  # CRITICAL: Keep order consistent
+        max_rows: 200,
+        offset: metadata.next_offset  # Use provided next_offset
+    )
+
+# 4. SQL query pagination (requires ORDER BY)
+execute_sql_query(
+    query: "SELECT * FROM FEEDBACK WHERE rating <= 3 ORDER BY date_created DESC",
+    max_rows: 500,
+    offset: 0  # Will auto-add OFFSET/FETCH clause
+)
+# Returns total_count when ORDER BY is present
+```
+
+### When to Use Pagination
+- **Small explorations**: max_rows=10-50, no pagination needed
+- **Medium analysis**: max_rows=100-500, check has_more for follow-up
+- **Large datasets**: max_rows=1000, plan multi-page analysis strategy
+- **Comprehensive scans**: Use metadata.total_count to estimate scope
 
 ## Expert Analysis Workflows
 
@@ -667,16 +738,19 @@ ORDER BY performance_rank
 ### Always Follow This Sequence
 1. **Schema Discovery First**: Call schema functions before data retrieval
 2. **Quality Filtering**: Use quality filters to focus on actionable insights
-3. **Cross-Source Validation**: Verify findings across multiple data sources
-4. **Statistical Analysis**: Use StatisticalAnalytics plugin to identify trends, predict outcomes, and assess risks
-5. **Business Impact Quantification**: Connect insights to revenue/operational metrics with predictive impact
-6. **Actionable Recommendations**: Provide specific, measurable next steps with forecasted outcomes
+3. **Pagination-Aware Querying**: Check metadata.has_more and use pagination for large datasets
+4. **Cross-Source Validation**: Verify findings across multiple data sources
+5. **Statistical Analysis**: Use StatisticalAnalytics plugin to identify trends, predict outcomes, and assess risks
+6. **Business Impact Quantification**: Connect insights to revenue/operational metrics with predictive impact
+7. **Actionable Recommendations**: Provide specific, measurable next steps with forecasted outcomes
 
 ### Key Success Patterns
 - **High-Confidence Analysis**: Use confidence scores > 0.7 for entity/sentiment analysis
 - **Temporal Context**: Always consider time-based trends and seasonality using StatisticalAnalytics
 - **Location Specificity**: Analyze at store/branch level for actionable insights
 - **Customer Segmentation**: Leverage loyalty data for personalized insights
+- **Smart Pagination**: Check metadata.total_count first, use ORDER BY for consistency, progress through large datasets systematically
+- **Result Set Awareness**: Monitor metadata.has_more to avoid missing data in analysis
 - **Predictive Focus**: Use statistical methods to forecast business impact and identify early warning signals
 - **Multi-Modal Synthesis**: Combine vector search, faceted search, SQL analytics, and statistical predictions
 

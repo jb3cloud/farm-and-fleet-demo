@@ -1,4 +1,4 @@
-Provide a combined analysis of friction points and their financial impact, drawing from social feedback, customer surveys, and the MEDALLIA_FEEDBACK database.
+Provide a combined analysis of friction points and their financial impact, drawing from social feedback, customer surveys, and the MEDALLIA_FEEDBACK2 database.
 
 can you identify specific stores with higher frustrations
 

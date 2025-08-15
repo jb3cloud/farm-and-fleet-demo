@@ -1,6 +1,6 @@
 {
     "table": {
-        "name": "MEDALLIA_FEEDBACK",
+        "name": "MEDALLIA_FEEDBACK2",
         "description": "Customer feedback data collected through various channels with AI-enhanced analysis including named entity recognition and opinion mining for friction point identification.",
         "business_purpose": "Stores customer feedback with transaction context and AI-generated insights to identify customer pain points and areas for operational improvement.",
         "data_source": "Medallia customer feedback platform with AI text analytics processing"
