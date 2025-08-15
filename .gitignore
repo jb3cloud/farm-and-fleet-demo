@@ -156,9 +156,6 @@ cython_debug/
 .DS_Store
 Thumbs.db
 
-# Chainlit
-.chainlit/
-
 # Data files (exclude sensitive data)
 source_data/
 

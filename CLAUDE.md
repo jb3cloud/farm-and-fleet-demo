@@ -45,7 +45,7 @@ uv run ruff format
 # Process and upload social media data
 uv run python scripts/social_media_upload.py
 
-# Process and upload survey data  
+# Process and upload survey data
 uv run python scripts/survey_upload.py
 
 # Run analytics on social media content
@@ -74,7 +74,7 @@ The system prompt enforces a **ReAct framework** (Reason → Act → Observe →
 ### CustomerInsights Plugin Functions
 - `get_analytics_schema()` - **MUST be called first** for feedback analysis
 - `search_customer_feedback()` - General semantic search
-- `find_friction_points()` - Targeted pain point discovery  
+- `find_friction_points()` - Targeted pain point discovery
 - `get_feedback_summary()` - Aggregate metrics
 - `search_priority_feedback()` - Business-priority ranking
 - `analyze_cross_sources()` - Cross-source comparison
@@ -118,7 +118,13 @@ AZURE_SEARCH_INDEX_NAME=social-media-index
 AZURE_SEARCH_SURVEY_INDEX_NAME=survey-index
 
 # SQL Database (Required for DatabaseInsights)
-SQL_CONNECTION_STRING=your-connection-string
+SQL_SERVER=your-sql-server
+SQL_PORT=1433
+SQL_DATABASE=your-database-name
+SQL_SCHEMA=dbo
+SQL_USERNAME=your-username
+SQL_PASSWORD=your-password
+SQL_TABLES=table1,table2,table3  # Optional: restrict to specific tables
 SQL_DATA_DICTIONARY_PATH=src/plugins/sqldb/data_dictionaries/
 ```
 
@@ -129,7 +135,7 @@ SQL_DATA_DICTIONARY_PATH=src/plugins/sqldb/data_dictionaries/
 - **Survey Data**: 61,787 responses with detailed feedback and location data
 - **Structure**: Stored in Azure Cognitive Search with vector embeddings
 
-### Business Data  
+### Business Data
 - **SQL Database**: 5 tables with transactional data
 - **Key Tables**: Customer, Orders, Items, Stores, Feedback
 - **Special Handling**: JSON columns for AI-extracted insights
@@ -144,7 +150,7 @@ SQL_DATA_DICTIONARY_PATH=src/plugins/sqldb/data_dictionaries/
 ### Business Impact Synthesis
 The core value proposition is connecting qualitative feedback to quantitative business metrics:
 1. **Identify Friction** - What customers are saying (CustomerInsights)
-2. **Quantify Impact** - Business metrics affected (DatabaseInsights)  
+2. **Quantify Impact** - Business metrics affected (DatabaseInsights)
 3. **Build Business Case** - Synthesized insights with financial implications
 
 ### Context Control Mechanisms
@@ -202,3 +208,7 @@ source_data/                 # Raw data files (surveys, social media)
 - Data dictionaries loaded once at startup and cached in memory
 - Search results limited by configurable parameters
 - SQL queries validated and protected against excessive resource usage
+
+# Reference Documentation
+- Deepwiki repository `Chainlit/chainlit`
+- Pydantic AI documentation `pydantic/pydantic-ai`
