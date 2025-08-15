@@ -1,3 +1,3 @@
-from .database_plugin import DatabasePlugin
+from .database_client import DatabaseClient
 
-__all__ = ["DatabasePlugin"]
+__all__ = ["DatabaseClient"]

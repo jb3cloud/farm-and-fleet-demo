@@ -11,16 +11,16 @@ Farm & Fleet Marketing Insights Platform - A Chainlit-based AI assistant that an
 ### Technology Stack
 - **Python 3.12+** with uv for dependency management
 - **Chainlit** for the conversational AI interface
-- **Semantic Kernel** for LLM orchestration and plugin management
+- **PydanticAI** for LLM orchestration and tool management
 - **Azure OpenAI** for chat completion
 - **Azure Cognitive Search** for semantic search across customer feedback
 - **SQL Server/Azure SQL** for transactional business data
 
-### Plugin-Based Architecture
-The application follows a modular plugin architecture with two main data sources:
+### Tool-Based Architecture
+The application follows a modular tool-based architecture with two main data sources:
 
-1. **CustomerInsights Plugin** (`src/plugins/search/`) - Semantic search across customer feedback
-2. **DatabaseInsights Plugin** (`src/plugins/sqldb/`) - SQL database querying and analysis
+1. **CustomerInsights Tools** (`src/plugins/search/`) - Semantic search across customer feedback
+2. **DatabaseInsights Tools** (`src/plugins/sqldb/`) - SQL database querying and analysis
 
 ## Essential Commands
 
@@ -30,7 +30,7 @@ The application follows a modular plugin architecture with two main data sources
 uv sync
 
 # Run the application
-uv run chainlit run src/app.py
+uv run chainlit run src/app_pydantic.py
 
 # Type checking with basedpyright
 uv run basedpyright
@@ -57,10 +57,10 @@ uv run python scripts/survey_analytics.py
 
 ## Core Application Flow
 
-### Main Application (`src/app.py`)
-- **Initialization**: Sets up Azure OpenAI service and loads plugins
+### Main Application (`src/app_pydantic.py`)
+- **Initialization**: Sets up Azure OpenAI service and loads tools
 - **System Prompt**: Loaded from `src/prompts/LLM_SYSTEM_PROMPT.md` with dynamic context
-- **Plugin Registration**: Automatically registers CustomerInsights and DatabaseInsights plugins
+- **Tool Registration**: Automatically registers CustomerInsights and DatabaseInsights tools
 - **Session Management**: Handles chat history and streaming responses
 
 ### ReAct Framework Implementation
@@ -69,9 +69,9 @@ The system prompt enforces a **ReAct framework** (Reason → Act → Observe →
 2. Connect customer feedback to quantifiable business metrics
 3. Follow structured analysis patterns
 
-## Plugin Architecture Details
+## Tool Architecture Details
 
-### CustomerInsights Plugin Functions
+### CustomerInsights Tool Functions
 - `get_analytics_schema()` - **MUST be called first** for feedback analysis
 - `search_customer_feedback()` - General semantic search
 - `find_friction_points()` - Targeted pain point discovery
@@ -79,7 +79,7 @@ The system prompt enforces a **ReAct framework** (Reason → Act → Observe →
 - `search_priority_feedback()` - Business-priority ranking
 - `analyze_cross_sources()` - Cross-source comparison
 
-### DatabaseInsights Plugin Functions
+### DatabaseInsights Tool Functions
 - `get_database_schema()` - **MUST be called first** for database analysis
 - `query_table_data()` - Simple table lookups
 - `get_table_summary()` - Table metadata
@@ -175,16 +175,14 @@ Both plugins implement "just enough" context controls:
 
 ```
 src/
-├── app.py                    # Main Chainlit application
+├── app_pydantic.py           # Main Chainlit application
 ├── prompts/
 │   └── LLM_SYSTEM_PROMPT.md # System prompt with ReAct framework
 └── plugins/
-    ├── search/              # CustomerInsights plugin
-    │   ├── search_client.py
-    │   └── friction_point_search_plugin.py
-    └── sqldb/               # DatabaseInsights plugin
+    ├── search/              # CustomerInsights tools
+    │   └── search_client.py
+    └── sqldb/               # DatabaseInsights tools
         ├── database_client.py
-        ├── database_plugin.py
         └── data_dictionaries/
             └── medallia_feedback.json
 
@@ -194,13 +192,13 @@ source_data/                 # Raw data files (surveys, social media)
 
 ## Important Development Notes
 
-### Plugin Integration
-- Plugins are automatically registered in `app.py` with graceful failure handling
+### Tool Integration
+- Tools are automatically registered in `app_pydantic.py` with graceful failure handling
 - Missing environment variables show warnings but don't break the application
-- Each plugin operates independently with cross-plugin synthesis at the LLM level
+- Each tool operates independently with cross-tool synthesis at the LLM level
 
 ### Error Handling Philosophy
-- Graceful degradation when plugins fail to load
+- Graceful degradation when tools fail to load
 - Detailed error messages for configuration issues
 - Continue operation with available capabilities rather than failing completely
 
