@@ -23,12 +23,16 @@ import chainlit as cl
 import dotenv
 import httpx
 from pydantic_ai import Agent, ModelRetry, RunContext
-
-# from pydantic_ai.messages import (
-#     FinalResultEvent,
-#     FunctionToolCallEvent,
-#     FunctionToolResultEvent,
-# )
+from pydantic_ai.messages import (
+    FinalResultEvent,
+    FunctionToolCallEvent,
+    FunctionToolResultEvent,
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPartDelta,
+    ThinkingPartDelta,
+    ToolCallPartDelta,
+)
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.azure import AzureProvider
 
@@ -109,22 +113,75 @@ def load_system_prompt() -> str:
 
 async def run_agent_with_steps(
     agent: Agent[AppDependencies, str],
-    message_content: str,
+    prompt: str,
     deps: AppDependencies,
-) -> str:
+) -> None:
     """
     Run PydanticAI agent and handle tool Steps sequentially like cl.step decorator.
     """
-    logger.info("Running agent with sequential Step handling...")
+    async with agent.iter(prompt, deps=deps) as run:
+        async for node in run:
+            if Agent.is_user_prompt_node(node):
+                # A user prompt node => The user has provided input
+                logger.info(f"=== UserPromptNode: {node.user_prompt} ===")
+            elif Agent.is_model_request_node(node):
+                # A model request node => We can stream tokens from the model's request
+                async with node.stream(run.ctx) as request_stream:
+                    final_result_found = False
+                    async for event in request_stream:
+                        if isinstance(event, PartStartEvent):
+                            logger.info(
+                                f"[Request] Starting part {event.index}: {event.part!r}"
+                            )
+                        elif isinstance(event, PartDeltaEvent):
+                            if isinstance(event.delta, TextPartDelta):
+                                logger.debug(
+                                    f"[Request] Part {event.index} text delta: {event.delta.content_delta!r}"
+                                )
+                            elif isinstance(event.delta, ThinkingPartDelta):
+                                logger.info(
+                                    f"[Request] Part {event.index} thinking delta: {event.delta.content_delta!r}"
+                                )
+                            elif isinstance(event.delta, ToolCallPartDelta):
+                                logger.info(
+                                    f"[Request] Part {event.index} args delta: {event.delta.args_delta}"
+                                )
+                        elif isinstance(event, FinalResultEvent):
+                            logger.info(
+                                f"[Result] The model started producing a final result (tool_name={event.tool_name})"
+                            )
+                            final_result_found = True
+                            break
 
-    # Create a Step for the entire agent interaction (without showing redundant input/output)
-    async with cl.Step(type="llm", name="AI Assistant"):
-        # Don't set input/output since they're redundant with the final message
+                    if final_result_found:
+                        # Once the final result is found, we can call `AgentStream.stream_text()` to stream the text.
+                        # A similar `AgentStream.stream_output()` method is available to stream structured output.
+                        msg = cl.Message(content="")
+                        async for output in request_stream.stream_text(delta=True):
+                            logger.debug(f"[Output] {output}")
+                            await msg.stream_token(output)
+                        await msg.send()
 
-        # Run the agent
-        result = await agent.run(message_content, deps=deps)
-
-        return result.output
+            elif Agent.is_call_tools_node(node):
+                # A handle-response node => The model returned some data, potentially calls a tool
+                logger.info(
+                    "=== CallToolsNode: streaming partial response & tool usage ==="
+                )
+                async with node.stream(run.ctx) as handle_stream:
+                    async for event in handle_stream:
+                        if isinstance(event, FunctionToolCallEvent):
+                            logger.info(
+                                f"[Tools] The LLM calls tool={event.part.tool_name!r} with args={event.part.args} (tool_call_id={event.part.tool_call_id!r})"
+                            )
+                        elif isinstance(event, FunctionToolResultEvent):
+                            logger.info(
+                                f"[Tools] Tool call {event.tool_call_id!r} returned => {event.result.content}"
+                            )
+            elif Agent.is_end_node(node):
+                # Once an End node is reached, the agent run is complete
+                assert run.result is not None
+                assert run.result.output == node.data.output
+                logger.info(f"=== Final Agent Output: {run.result.output} ===")
 
 
 def create_agent_with_tools() -> Agent[AppDependencies, str]:
@@ -1536,11 +1593,7 @@ async def on_message(message: cl.Message) -> None:
 
         # Use working non-streaming approach with proper Step ordering
         try:
-            # Run agent with Step handling
-            response_content = await run_agent_with_steps(agent, message.content, deps)
-
-            # Send the final response
-            await cl.Message(content=response_content).send()
+            await run_agent_with_steps(agent, message.content, deps)
 
         except Exception as e:
             logger.error(f"Agent run failed: {str(e)}")

@@ -495,7 +495,7 @@ wheels = [
 
 [[package]]
 name = "chainlit"
-version = "2.6.8"
+version = "2.6.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -522,9 +522,9 @@ dependencies = [
     { name = "uvicorn" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/42/10/3cfc5385de99254bfbf2481111d7ba99e49b80911efb6b03b43b8977790e/chainlit-2.6.8.tar.gz", hash = "sha256:2de82e5b235d5c8b92c4a5d7b84abd855b5a8ffc450a658e863c6670afcc830d", size = 9509781, upload-time = "2025-08-08T15:00:03.644Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/9b/a774fac550e614216a012e17e96584a263d3286a424bd5eac2b83346fbec/chainlit-2.6.9.tar.gz", hash = "sha256:a93c3177c1c59dee5557921f01482c003826e86c2f2f89432033e340a32a98c9", size = 9510086, upload-time = "2025-08-14T20:09:28.437Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/04/434d2d939410f6771b52a7f3f2464c5e5dbaceb784408afac0e721823387/chainlit-2.6.8-py3-none-any.whl", hash = "sha256:d34dd00877705e685ee4a45d1f3f9e8044f4792d6554011555412acd87aeb8fa", size = 9659250, upload-time = "2025-08-08T15:00:01.116Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/19/0d0db412ccfd14c8869a3c89de7ebc2cfbbd7cb49b2761c903f4d207b6f8/chainlit-2.6.9-py3-none-any.whl", hash = "sha256:8f6d449cf4f52e1fdb7afaec7421a3870cfa2247e78abaf15d0f540aecc15411", size = 9659470, upload-time = "2025-08-14T20:09:25.926Z" },
 ]
 
 [[package]]
@@ -777,7 +777,7 @@ requires-dist = [
     { name = "azure-ai-textanalytics", specifier = "==5.3.0" },
     { name = "azure-core", specifier = ">=1.35.0" },
     { name = "azure-search-documents", specifier = "==11.5.3" },
-    { name = "chainlit", specifier = ">=2.6.8" },
+    { name = "chainlit", specifier = ">=2.6.9" },
     { name = "networkx", specifier = ">=3.5" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "openai", specifier = ">=1.0.0" },

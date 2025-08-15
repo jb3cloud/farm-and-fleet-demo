@@ -8,7 +8,7 @@ dependencies = [
     "azure-ai-textanalytics==5.3.0",
     "azure-core>=1.35.0",
     "azure-search-documents==11.5.3",
-    "chainlit>=2.6.8",
+    "chainlit>=2.6.9",
     "networkx>=3.5",
     "numpy>=1.26.4",
     "openai>=1.0.0",
@@ -26,10 +26,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "basedpyright>=1.31.1",
-    "ruff>=0.12.7",
-]
+dev = ["basedpyright>=1.31.1", "ruff>=0.12.7"]
 
 [tool.basedpyright]
 # Type checking configuration
