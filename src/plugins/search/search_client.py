@@ -13,6 +13,73 @@ from azure.search.documents import SearchClient
 logger = logging.getLogger(__name__)
 
 
+# Friction category mapping from user-friendly names to actual regex patterns in the index
+FRICTION_CATEGORY_MAPPING = {
+    # Store experience and operations
+    "store experience": "(?i)\\b(closed|hours|open|parking|location|store)\\b",
+    "store operations": "(?i)\\b(closed|hours|open|parking|location|store)\\b",
+    "store hours": "(?i)\\b(closed|hours|open|parking|location|store)\\b",
+    "store location": "(?i)\\b(closed|hours|open|parking|location|store)\\b",
+    "parking": "(?i)\\b(closed|hours|open|parking|location|store)\\b",
+    "location": "(?i)\\b(closed|hours|open|parking|location|store)\\b",
+    # Pricing and costs
+    "pricing": "(?i)\\b(price|pricing|expensive|cheap|cost|money)\\b",
+    "price": "(?i)\\b(price|pricing|expensive|cheap|cost|money)\\b",
+    "cost": "(?i)\\b(price|pricing|expensive|cheap|cost|money)\\b",
+    "expensive": "(?i)\\b(price|pricing|expensive|cheap|cost|money)\\b",
+    "money": "(?i)\\b(price|pricing|expensive|cheap|cost|money)\\b",
+    # Online and digital experience
+    "online shopping": "(?i)\\b(website|app|online|digital|order|delivery|shipping)\\b",
+    "website": "(?i)\\b(website|app|online|digital|order|delivery|shipping)\\b",
+    "app": "(?i)\\b(website|app|online|digital|order|delivery|shipping)\\b",
+    "digital": "(?i)\\b(website|app|online|digital|order|delivery|shipping)\\b",
+    "delivery": "(?i)\\b(website|app|online|digital|order|delivery|shipping)\\b",
+    "shipping": "(?i)\\b(website|app|online|digital|order|delivery|shipping)\\b",
+    "online order": "(?i)\\b(website|app|online|digital|order|delivery|shipping)\\b",
+    "order": "(?i)\\b(website|app|online|digital|order|delivery|shipping)\\b",
+    # Inventory and stock issues
+    "inventory": "(?i)\\b(restock|restocked|inventory|supply)\\b",
+    "stock": "(?i)\\b(restock|restocked|inventory|supply)\\b",
+    "restock": "(?i)\\b(restock|restocked|inventory|supply)\\b",
+    "supply": "(?i)\\b(restock|restocked|inventory|supply)\\b",
+    "product availability": "(?i)\\b(out of stock|sold out|empty|unavailable|shortage|limited)\\b",
+    "out of stock": "(?i)\\b(out of stock|sold out|empty|unavailable|shortage|limited)\\b",
+    "sold out": "(?i)\\b(out of stock|sold out|empty|unavailable|shortage|limited)\\b",
+    "unavailable": "(?i)\\b(out of stock|sold out|empty|unavailable|shortage|limited)\\b",
+    "shortage": "(?i)\\b(out of stock|sold out|empty|unavailable|shortage|limited)\\b",
+    # Customer service and staff
+    "customer service": "(?i)\\b(waited|wait|line|queue|slow|staff|employee|rude|unhelpful|service)\\b",
+    "service": "(?i)\\b(waited|wait|line|queue|slow|staff|employee|rude|unhelpful|service)\\b",
+    "staff": "(?i)\\b(waited|wait|line|queue|slow|staff|employee|rude|unhelpful|service)\\b",
+    "employee": "(?i)\\b(waited|wait|line|queue|slow|staff|employee|rude|unhelpful|service)\\b",
+    "wait time": "(?i)\\b(waited|wait|line|queue|slow|staff|employee|rude|unhelpful|service)\\b",
+    "waiting": "(?i)\\b(waited|wait|line|queue|slow|staff|employee|rude|unhelpful|service)\\b",
+    "queue": "(?i)\\b(waited|wait|line|queue|slow|staff|employee|rude|unhelpful|service)\\b",
+    "slow service": "(?i)\\b(waited|wait|line|queue|slow|staff|employee|rude|unhelpful|service)\\b",
+    # Product quality and returns
+    "product quality": "(?i)\\b(broken|defective|quality|return|exchange|warranty)\\b",
+    "quality": "(?i)\\b(broken|defective|quality|return|exchange|warranty)\\b",
+    "broken": "(?i)\\b(broken|defective|quality|return|exchange|warranty)\\b",
+    "defective": "(?i)\\b(broken|defective|quality|return|exchange|warranty)\\b",
+    "return": "(?i)\\b(broken|defective|quality|return|exchange|warranty)\\b",
+    "exchange": "(?i)\\b(broken|defective|quality|return|exchange|warranty)\\b",
+    "warranty": "(?i)\\b(broken|defective|quality|return|exchange|warranty)\\b",
+    # Checkout and payment
+    "checkout": "(?i)\\b(checkout|register|cashier|customer service)\\b",
+    "checkout process": "(?i)\\b(checkout|register|cashier|customer service)\\b",
+    "register": "(?i)\\b(checkout|register|cashier|customer service)\\b",
+    "cashier": "(?i)\\b(checkout|register|cashier|customer service)\\b",
+    # Sentiment and general experience
+    "sentiment": "(?i)\\b(disappointed|terrible|awful|great|excellent|love)\\b",
+    "disappointed": "(?i)\\b(disappointed|terrible|awful|great|excellent|love)\\b",
+    "terrible": "(?i)\\b(disappointed|terrible|awful|great|excellent|love)\\b",
+    "awful": "(?i)\\b(disappointed|terrible|awful|great|excellent|love)\\b",
+    "great": "(?i)\\b(disappointed|terrible|awful|great|excellent|love)\\b",
+    "excellent": "(?i)\\b(disappointed|terrible|awful|great|excellent|love)\\b",
+    "love": "(?i)\\b(disappointed|terrible|awful|great|excellent|love)\\b",
+}
+
+
 class AzureSearchClientWrapper:
     """Internal Azure Search client with 'just enough' context controls."""
 
@@ -29,6 +96,48 @@ class AzureSearchClientWrapper:
             )
 
         self.credential = AzureKeyCredential(self.api_key)
+
+    def _map_friction_category(self, user_category: str) -> str:
+        """Map user-friendly category name to actual regex pattern in the index.
+
+        Args:
+            user_category: User-friendly category name (e.g., "store experience", "pricing")
+
+        Returns:
+            Actual regex pattern that exists in the frictionCategories field, or the
+            original category if no mapping is found (backward compatibility)
+        """
+        # Convert to lowercase for case-insensitive matching
+        category_lower = user_category.lower().strip()
+
+        # Check if we have a mapping for this category
+        if category_lower in FRICTION_CATEGORY_MAPPING:
+            mapped_pattern = FRICTION_CATEGORY_MAPPING[category_lower]
+            logger.debug(
+                f"Mapped friction category '{user_category}' to pattern '{mapped_pattern}'"
+            )
+            return mapped_pattern
+
+        # Check if the input is already a regex pattern (backward compatibility)
+        if user_category.startswith("(?i)\\b") and user_category.endswith("\\b"):
+            logger.debug(
+                f"Category '{user_category}' appears to be a regex pattern, using as-is"
+            )
+            return user_category
+
+        # No mapping found - return original for backward compatibility
+        logger.warning(
+            f"No friction category mapping found for '{user_category}'. Available categories: {list(FRICTION_CATEGORY_MAPPING.keys())}"
+        )
+        return user_category
+
+    def get_available_friction_categories(self) -> list[str]:
+        """Get list of all available user-friendly friction categories.
+
+        Returns:
+            List of user-friendly category names that can be used in friction searches
+        """
+        return sorted(FRICTION_CATEGORY_MAPPING.keys())
 
     def _get_search_client(self, source: str) -> SearchClient:
         """Get SearchClient for specified data source."""
@@ -231,6 +340,7 @@ class AzureSearchClientWrapper:
         quality_level: str = "high_and_medium",
         detail_level: str = "standard",
         additional_filters: str | None = None,
+        offset: int = 0,
     ) -> dict[str, Any]:
         """Execute semantic search with full 'just enough' controls."""
         try:
@@ -241,12 +351,13 @@ class AzureSearchClientWrapper:
             combined_filter = self._combine_filters(quality_filter, additional_filters)
             select_fields = self._get_field_selection(detail_level, "general", source)
 
-            # Execute search with semantic ranking
+            # Execute search with semantic ranking and pagination
             results = client.search(
                 search_text=query,
                 filter=combined_filter,
                 select=select_fields,
                 top=min(max_results, 50),  # Cap at 50 for performance
+                skip=offset,  # Add pagination support
                 query_type="semantic",
                 semantic_configuration_name=self._get_semantic_config(source),
                 query_caption="extractive",
@@ -257,11 +368,18 @@ class AzureSearchClientWrapper:
                 results, detail_level, max_results
             )
 
+            # Get total count from Azure Search
+            total_count = getattr(results, "get_count", lambda: len(formatted_results))()
+            returned_count = len(formatted_results)
+            has_more = (offset + returned_count) < total_count
+
             return {
                 "results": formatted_results,
-                "total_count": getattr(
-                    results, "get_count", lambda: len(formatted_results)
-                )(),
+                "total_count": total_count,
+                "returned_count": returned_count,
+                "offset": offset,
+                "has_more": has_more,
+                "next_offset": offset + max_results if has_more else None,
                 "search_query": query,
                 "source": source,
                 "controls_applied": {
@@ -289,13 +407,31 @@ class AzureSearchClientWrapper:
         quality_level: str = "high_only",
         detail_level: str = "standard",
         additional_filters: str | None = None,
+        offset: int = 0,
     ) -> dict[str, Any]:
-        """Search for specific friction points with aggressive filtering."""
+        """Search for specific friction points with aggressive filtering.
+
+        Args:
+            category: User-friendly category name (e.g., "store experience", "pricing")
+                     or actual regex pattern from the index
+            source: Data source ('social' or 'surveys')
+            max_results: Maximum results to return
+            quality_level: Quality filtering level
+            detail_level: Detail level for results
+            additional_filters: Additional OData filters
+
+        Returns:
+            Dictionary with search results and metadata including mapping information
+        """
         try:
             client = self._get_search_client(source)
 
-            # Build friction-specific filter
-            friction_filter = f"frictionCategories/any(cat: cat eq '{category}')"
+            # Map user-friendly category to actual regex pattern in the index
+            original_category = category
+            mapped_category = self._map_friction_category(category)
+
+            # Build friction-specific filter using the mapped category
+            friction_filter = f"frictionCategories/any(cat: cat eq '{mapped_category}')"
             quality_filter = self._get_quality_filter(quality_level, source)
             combined_filter = self._combine_filters(
                 friction_filter, quality_filter, additional_filters
@@ -303,12 +439,13 @@ class AzureSearchClientWrapper:
 
             select_fields = self._get_field_selection(detail_level, "friction", source)
 
-            # Execute search
+            # Execute search with pagination
             results = client.search(
                 search_text="*",  # Search all documents
                 filter=combined_filter,
                 select=select_fields,
                 top=min(max_results, 50),
+                skip=offset,  # Add pagination support
                 include_total_count=True,
             )
 
@@ -316,12 +453,22 @@ class AzureSearchClientWrapper:
                 results, detail_level, max_results
             )
 
+            # Get total count from Azure Search
+            total_count = getattr(results, "get_count", lambda: len(formatted_results))()
+            returned_count = len(formatted_results)
+            has_more = (offset + returned_count) < total_count
+
             return {
                 "results": formatted_results,
-                "total_count": getattr(
-                    results, "get_count", lambda: len(formatted_results)
-                )(),
-                "friction_category": category,
+                "total_count": total_count,
+                "returned_count": returned_count,
+                "offset": offset,
+                "has_more": has_more,
+                "next_offset": offset + max_results if has_more else None,
+                "friction_category": original_category,
+                "mapped_category": mapped_category
+                if mapped_category != original_category
+                else None,
                 "source": source,
                 "controls_applied": {
                     "quality_level": quality_level,
@@ -332,11 +479,20 @@ class AzureSearchClientWrapper:
 
         except Exception as e:
             logger.error(f"Friction search failed: {str(e)}")
+            # Include helpful error information for unmapped categories
+            error_msg = f"Friction search failed: {str(e)}"
+            if "No friction category mapping found" in str(e):
+                available_categories = self.get_available_friction_categories()
+                error_msg += (
+                    f". Available categories: {', '.join(available_categories[:5])}..."
+                )
+
             return {
                 "results": [],
                 "total_count": 0,
-                "error": f"Friction search failed: {str(e)}",
+                "error": error_msg,
                 "friction_category": category,
+                "available_categories": self.get_available_friction_categories(),
                 "source": source,
             }
 
@@ -417,6 +573,7 @@ class AzureSearchClientWrapper:
         source: str,
         max_results: int = 10,
         detail_level: str = "standard",
+        offset: int = 0,
     ) -> dict[str, Any]:
         """Execute priority-ranked search using scoring profiles."""
         try:
@@ -427,12 +584,13 @@ class AzureSearchClientWrapper:
             select_fields = self._get_field_selection(detail_level, "priority", source)
             scoring_profile = self._get_scoring_profile(priority_type, source)
 
-            # Execute search with priority ranking
+            # Execute search with priority ranking and pagination
             search_kwargs = {
                 "search_text": query,
                 "filter": quality_filter,
                 "select": select_fields,
                 "top": min(max_results, 50),
+                "skip": offset,  # Add pagination support
                 "query_type": "semantic",
                 "semantic_configuration_name": self._get_semantic_config(source),
                 "include_total_count": True,
@@ -448,11 +606,18 @@ class AzureSearchClientWrapper:
                 results, detail_level, max_results
             )
 
+            # Get total count from Azure Search
+            total_count = getattr(results, "get_count", lambda: len(formatted_results))()
+            returned_count = len(formatted_results)
+            has_more = (offset + returned_count) < total_count
+
             return {
                 "results": formatted_results,
-                "total_count": getattr(
-                    results, "get_count", lambda: len(formatted_results)
-                )(),
+                "total_count": total_count,
+                "returned_count": returned_count,
+                "offset": offset,
+                "has_more": has_more,
+                "next_offset": offset + max_results if has_more else None,
                 "search_query": query,
                 "priority_type": priority_type,
                 "source": source,

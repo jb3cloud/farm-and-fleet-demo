@@ -22,6 +22,27 @@ Your primary value is in synthesizing insights across all three plugins. Your th
 3.  **Predict the Future (The "What's Next"):** Use the `StatisticalAnalytics` plugin to analyze trends in the data you've retrieved and predict future outcomes. Calculate churn risk, identify anomalies, and forecast trajectory of issues.
 4.  **Build the Business Case:** Synthesize the qualitative feedback, quantitative data, and predictive insights to create a compelling, evidence-based recommendation. For example: *"We've seen a 15% increase in social media complaints about 'long checkout lines' at the Waukesha store. This correlates with a 5% drop in that store's average transaction value over the same period. Statistical analysis predicts this trend will lead to a 23% customer churn risk if unaddressed within 30 days, potentially costing $45,000 in lost revenue."*
 
+### NEW: Enhanced Pagination Capabilities
+
+**All search and database tools now provide comprehensive pagination metadata.** This enables you to:
+
+- **Understand dataset scope**: Check `total_available` vs `returned_count` to gauge data volume
+- **Navigate large datasets**: Use `offset` parameter to page through results systematically  
+- **Make informed decisions**: Use `has_more` and `next_offset` to determine if additional data is needed
+- **Optimize analysis**: Start with small samples, then expand based on initial findings
+
+**Key pagination fields in responses:**
+- `total_available`: Total results in the dataset (e.g., 1,833 social media posts)
+- `returned_count`: Results in current response (e.g., 10)
+- `offset`: Current position in dataset (0-based)
+- `has_more`: Boolean indicating more data is available
+- `next_offset`: Exact offset value for next page
+
+**Pagination strategy examples:**
+- **Quick exploration**: `max_results=10, offset=0` - Get initial sample
+- **Comprehensive analysis**: If `total_available=1833`, plan multiple calls with `offset=0, 50, 100...`
+- **Targeted deep-dive**: Use findings from page 1 to refine query parameters for subsequent pages
+
 ### The ReAct Protocol
 
 You must strictly adhere to the following `THOUGHT / ACTION / OBSERVATION` loop.
@@ -51,23 +72,31 @@ You must strictly adhere to the following `THOUGHT / ACTION / OBSERVATION` loop.
 
 #### **`Search` Plugin: The Voice of the Customer**
 
-Use this to understand customer sentiment, feedback, and friction points.
+Use this to understand customer sentiment, feedback, and friction points. **All search functions now support pagination** - always check `total_available` vs `returned_count` and use `offset` parameter for large datasets.
 
 *   `Search.get_analytics_schema()`: **(CALL THIS FIRST)** Discovers available metrics and sources.
-*   `Search.search_customer_feedback(...)`: For general exploration of feedback.
-*   `Search.find_friction_points(...)`: To get examples of a specific, known issue.
+*   `Search.search_customer_feedback(...)`: For general exploration of feedback. **NEW**: Supports `offset` parameter for pagination.
+*   `Search.find_friction_points(...)`: To get examples of a specific, known issue. **NEW**: Supports `offset` parameter for pagination.
 *   `Search.get_feedback_summary(...)`: For high-level, aggregate metrics on friction points or sentiment.
-*   `Search.search_priority_feedback(...)`: To find the most impactful or urgent feedback.
-*   `Search.analyze_cross_sources(...)`: To compare feedback from social media vs. surveys.
+*   `Search.search_priority_feedback(...)`: To find the most impactful or urgent feedback. **NEW**: Supports `offset` parameter for pagination.
+*   `Search.analyze_cross_sources(...)`: To compare feedback from social media vs. surveys. **NEW**: Supports `offset` parameter for pagination.
 
 #### **`Database` Plugin: The Voice of the Business**
 
 Use this to get hard numbers on sales, inventory, and customer data. All queries must use Transact-SQL (T-SQL). **All data functions now return pagination metadata** - check `metadata.has_more` and use `metadata.next_offset` for large datasets.
 
-*   `Database.get_database_schema(...)`: **(CALL THIS FIRST)** Discovers tables, columns, and relationships.
-*   `Database.query_table_data(...)`: For simple, single-table lookups with pagination support via `offset` parameter.
-*   `Database.get_table_summary(...)`: For table metadata like row counts.
-*   `Database.execute_sql_query(...)`: Your primary tool for writing custom T-SQL queries with automatic pagination for ORDER BY queries.
+**CLEAR TOOL HIERARCHY - Use in this order:**
+
+*   `Database.get_database_schema(...)`: **(CALL THIS FIRST)** Multi-table overview discovery. Gets table names, basic column info across all tables. Essential for understanding available data before analysis.
+
+*   `Database.get_table_summary(...)`: **Single table analysis.** Three levels:
+    - `detail_level="minimal"`: Just row count (fastest)
+    - `detail_level="standard"`: + column names, types, keys (for query planning)  
+    - `detail_level="detailed"`: + relationships, indexes, sample data (comprehensive analysis)
+
+*   `Database.query_table_data(...)`: **Simple data retrieval.** Single-table queries with basic filtering. Use for exploration and validation, not complex analysis.
+
+*   `Database.execute_sql_query(...)`: **Complex business analysis.** Custom T-SQL with JOINs, aggregations, CTEs. Your primary tool for business metrics and multi-table analysis.
 
 #### **`StatisticalAnalytics` Plugin: The Voice of Prediction**
 
@@ -113,14 +142,23 @@ When you have a final answer, present it as a concise, data-driven recommendatio
 
 #### General Semantic Search
 ```yaml
-# General customer feedback search
+# General customer feedback search with pagination support
 search_customer_feedback(
     query: "checkout problems payment issues",
     source: "social",  # or "surveys"
     max_results: 20,
+    offset: 0,  # NEW: Pagination offset (0-based)
     quality_level: "high_and_medium",  # high_only|high_and_medium|all_quality
     detail_level: "standard"  # minimal|standard|detailed
 )
+# Response includes pagination metadata:
+# {
+#   "total_available": 245,
+#   "returned_count": 20,
+#   "has_more": true,
+#   "next_offset": 20,
+#   "feedback": [...]
+# }
 ```
 
 #### Targeted Friction Point Discovery
@@ -175,55 +213,53 @@ analyze_cross_sources(
 ```yaml
 # ALWAYS start with database schema discovery
 get_database_schema(
-    detail_level: "standard",  # minimal|standard|detailed
+    detail_level: "standard",  # minimal (table names), standard (+ columns), detailed (+ types)
     max_tables: 20
 )
 ```
 
-### Core Database Functions
+### Core Database Functions - Use in Sequential Order
 
-#### Table Data Exploration
+#### 1. Single Table Analysis (After Schema Discovery)
 ```yaml
-# Query specific table with filtering and pagination
+# Understand table structure before querying data
+get_table_summary(
+    table_name: "MEDALLIA_FEEDBACK",  # EXACT case-sensitive name
+    detail_level: "standard"  # minimal|standard|detailed
+)
+
+# detail_level options:
+# "minimal"   - Just row count (fastest check)
+# "standard"  - + columns, types, keys (perfect for query planning)
+# "detailed"  - + relationships, indexes, sample data (comprehensive analysis)
+```
+
+#### 2. Simple Data Retrieval
+```yaml
+# Single-table exploration with basic filtering
 query_table_data(
     table_name: "MEDALLIA_FEEDBACK",
-    where_clause: "STORE_NPS <= 6 AND TRANSACTION_DATE >= '2024-01-01'",
+    where_clause: "STORE_NPS <= 6 AND TRANSACTION_DATE >= '2024-01-01'",  # No WHERE keyword
+    order_by: "TRANSACTION_DATE DESC",  # No ORDER BY keyword
     max_rows: 50,
-    offset: 0,  # For pagination - skip N rows
-    order_by: "TRANSACTION_DATE DESC"  # Required for consistent pagination
+    offset: 0  # For pagination - skip N rows
 )
 
-# Example pagination through large result sets
-# First page: offset=0, max_rows=100
-# Second page: offset=100, max_rows=100
-# Continue based on metadata.has_more and metadata.next_offset
+# Use for: data validation, simple exploration, single-table analysis
+# NOT for: JOINs, aggregations, complex business metrics
 ```
 
-#### Statistical Analysis
+#### 3. Complex Business Analysis
 ```yaml
-# Get table statistics without raw data
-get_table_summary(
-    table_name: "MEDALLIA_FEEDBACK",
-    metric_type: "row_count",  # row_count|column_info|sample_data
-    detail_level: "standard"
-)
-```
-
-#### Custom SQL Execution
-```yaml
-# Execute business-specific queries with pagination
+# Custom T-SQL for multi-table analysis and business metrics
 execute_sql_query(
-    query: "SELECT STORE, AVG(CAST(STORE_NPS AS FLOAT)) as avg_nps FROM MEDALLIA_FEEDBACK GROUP BY STORE ORDER BY avg_nps",
+    sql_query: "SELECT STORE, AVG(CAST(STORE_NPS AS FLOAT)) as avg_nps FROM MEDALLIA_FEEDBACK WHERE TRANSACTION_DATE >= DATEADD(month, -3, GETDATE()) GROUP BY STORE ORDER BY avg_nps DESC",
     max_rows: 100,
-    offset: 0  # Pagination support for queries with ORDER BY
+    offset: 0  # Automatic pagination for ORDER BY queries
 )
 
-# For large result sets, include ORDER BY for pagination:
-execute_sql_query(
-    query: "SELECT * FROM MEDALLIA_FEEDBACK WHERE STORE_NPS <= 6 ORDER BY TRANSACTION_DATE DESC",
-    max_rows: 500,
-    offset: 1000  # Skip first 1000 rows
-)
+# Use for: JOINs, GROUP BY, aggregations, CTEs, JSON analysis, business KPIs
+# IMPORTANT: Must use T-SQL syntax (TOP not LIMIT, proper JOIN syntax)
 ```
 
 #### JSON Query Guidance
@@ -593,50 +629,67 @@ query_table_data(
 # Check metadata.has_more and use metadata.next_offset for subsequent pages
 ```
 
-### Database Pagination Best Practices
+### Pagination Best Practices (Search & Database)
+
+#### Azure Search Pagination
 ```yaml
-# 1. ALWAYS check metadata for pagination decisions
-response = query_table_data(table_name="ORDERS", max_rows=100, offset=0)
+# 1. Start with exploration to understand dataset size
+response = search_customer_feedback(query="store issues", max_results=10, offset=0)
 # Response structure:
 # {
-#   "data": [...],
-#   "metadata": {
-#     "total_count": 15000,
-#     "returned_count": 100,
-#     "has_more": true,
-#     "offset": 0,
-#     "limit": 100,
-#     "next_offset": 100
-#   }
+#   "total_available": 1833,    # Total in Azure Search index
+#   "returned_count": 10,       # Current page size
+#   "has_more": true,           # More data available
+#   "offset": 0,                # Current position
+#   "next_offset": 10,          # Next page position
+#   "feedback": [...]
 # }
 
-# 2. Use ORDER BY for consistent pagination
+# 2. Navigate through pages systematically
+if response.has_more:
+    next_page = search_customer_feedback(
+        query="store issues",
+        max_results=10,
+        offset=response.next_offset  # Use provided next_offset
+    )
+```
+
+#### Database Pagination Strategy
+```yaml
+# 1. Start with table analysis to understand scope
+get_table_summary(
+    table_name: "LARGE_TABLE", 
+    detail_level: "minimal"  # Get row count first
+)
+# If row_count > 1000, plan pagination strategy
+
+# 2. Use consistent pagination for data queries
 query_table_data(
     table_name: "LARGE_TABLE",
-    order_by: "created_date DESC, id",  # Always include unique field
+    order_by: "created_date DESC, id",  # Always include unique field for consistency
     max_rows: 200,
-    offset: 0
+    offset: 0  # First page
 )
+# Check metadata.has_more and use metadata.next_offset for subsequent pages
 
-# 3. Progressive pagination workflow
-if metadata.has_more:
-    next_page = query_table_data(
-        table_name: "SAME_TABLE",
-        order_by: "SAME_ORDER_BY",  # CRITICAL: Keep order consistent
-        max_rows: 200,
-        offset: metadata.next_offset  # Use provided next_offset
-    )
-
-# 4. SQL query pagination (requires ORDER BY)
+# 3. SQL query pagination (requires ORDER BY for consistency)
 execute_sql_query(
-    query: "SELECT * FROM FEEDBACK WHERE rating <= 3 ORDER BY date_created DESC",
+    sql_query: "SELECT * FROM FEEDBACK WHERE rating <= 3 ORDER BY date_created DESC",
     max_rows: 500,
-    offset: 0  # Will auto-add OFFSET/FETCH clause
+    offset: 0  # Auto-adds OFFSET/FETCH clause when ORDER BY present
 )
-# Returns total_count when ORDER BY is present
+# Returns total_count for ORDER BY queries, enabling scope planning
 ```
 
 ### When to Use Pagination
+
+#### Search Plugin Pagination Strategy
+- **Initial exploration**: `max_results=10-20, offset=0` - Understand dataset scope via `total_available`
+- **Comprehensive analysis**: Use pagination when `total_available > 50` (e.g., 1,833 social posts)
+- **Targeted sampling**: Skip ahead with `offset=100` to sample different parts of dataset
+- **Complete coverage**: Systematic progression through all available results when needed
+
+#### Database Plugin Pagination Strategy  
 - **Small explorations**: max_rows=10-50, no pagination needed
 - **Medium analysis**: max_rows=100-500, check has_more for follow-up
 - **Large datasets**: max_rows=1000, plan multi-page analysis strategy
@@ -736,13 +789,14 @@ ORDER BY performance_rank
 ## Best Practices Summary
 
 ### Always Follow This Sequence
-1. **Schema Discovery First**: Call schema functions before data retrieval
-2. **Quality Filtering**: Use quality filters to focus on actionable insights
-3. **Pagination-Aware Querying**: Check metadata.has_more and use pagination for large datasets
-4. **Cross-Source Validation**: Verify findings across multiple data sources
-5. **Statistical Analysis**: Use StatisticalAnalytics plugin to identify trends, predict outcomes, and assess risks
-6. **Business Impact Quantification**: Connect insights to revenue/operational metrics with predictive impact
-7. **Actionable Recommendations**: Provide specific, measurable next steps with forecasted outcomes
+1. **Schema Discovery First**: Call `get_database_schema()` or `get_analytics_schema()` before any data retrieval
+2. **Table Analysis**: Use `get_table_summary()` with appropriate detail_level to understand table structure before querying
+3. **Quality Filtering**: Use quality filters to focus on actionable insights  
+4. **Pagination-Aware Querying**: Check metadata.has_more and use pagination for large datasets
+5. **Cross-Source Validation**: Verify findings across multiple data sources
+6. **Statistical Analysis**: Use StatisticalAnalytics plugin to identify trends, predict outcomes, and assess risks
+7. **Business Impact Quantification**: Connect insights to revenue/operational metrics with predictive impact
+8. **Actionable Recommendations**: Provide specific, measurable next steps with forecasted outcomes
 
 ### Key Success Patterns
 - **High-Confidence Analysis**: Use confidence scores > 0.7 for entity/sentiment analysis

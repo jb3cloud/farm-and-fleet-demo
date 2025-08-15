@@ -1863,7 +1863,7 @@ class SurveyAnalyticsClient:
         # Location-based recommendations
         if location_insights:
             low_performing_locations = [
-                l for l in location_insights if l.average_response_quality < 0.5
+                loc for loc in location_insights if loc.average_response_quality < 0.5
             ]
             if low_performing_locations:
                 recommendations.append(
@@ -1871,7 +1871,7 @@ class SurveyAnalyticsClient:
                 )
 
             high_friction_locations = [
-                l for l in location_insights if len(l.friction_categories) > 5
+                loc for loc in location_insights if len(loc.friction_categories) > 5
             ]
             if high_friction_locations:
                 recommendations.append(
