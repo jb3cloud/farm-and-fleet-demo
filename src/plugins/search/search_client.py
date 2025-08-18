@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 # Friction category mapping from user-friendly names to actual regex patterns in the index
+# Mapping from user-friendly categories to the actual regex patterns stored in frictionCategories field
 FRICTION_CATEGORY_MAPPING = {
     # Store experience and operations
     "store experience": "(?i)\\b(closed|hours|open|parking|location|store)\\b",
@@ -110,11 +111,15 @@ class AzureSearchClientWrapper:
         # Convert to lowercase for case-insensitive matching
         category_lower = user_category.lower().strip()
 
+        logger.debug(
+            f"Mapping friction category: '{user_category}' -> '{category_lower}'"
+        )
+
         # Check if we have a mapping for this category
         if category_lower in FRICTION_CATEGORY_MAPPING:
             mapped_pattern = FRICTION_CATEGORY_MAPPING[category_lower]
             logger.debug(
-                f"Mapped friction category '{user_category}' to pattern '{mapped_pattern}'"
+                f"Successfully mapped friction category '{user_category}' to pattern '{mapped_pattern}'"
             )
             return mapped_pattern
 
@@ -125,9 +130,20 @@ class AzureSearchClientWrapper:
             )
             return user_category
 
+        # Check for partial matches or similar categories
+        possible_matches = [
+            key
+            for key in FRICTION_CATEGORY_MAPPING.keys()
+            if category_lower in key or key in category_lower
+        ]
+        if possible_matches:
+            logger.warning(
+                f"No exact mapping found for '{user_category}', but found similar categories: {possible_matches}"
+            )
+
         # No mapping found - return original for backward compatibility
         logger.warning(
-            f"No friction category mapping found for '{user_category}'. Available categories: {list(FRICTION_CATEGORY_MAPPING.keys())}"
+            f"No friction category mapping found for '{user_category}'. Available categories: {list(FRICTION_CATEGORY_MAPPING.keys())[:10]}..."
         )
         return user_category
 
@@ -137,7 +153,9 @@ class AzureSearchClientWrapper:
         Returns:
             List of user-friendly category names that can be used in friction searches
         """
-        return sorted(FRICTION_CATEGORY_MAPPING.keys())
+        categories = sorted(FRICTION_CATEGORY_MAPPING.keys())
+        logger.debug(f"Available friction categories: {len(categories)} total")
+        return categories
 
     def _get_search_client(self, source: str) -> SearchClient:
         """Get SearchClient for specified data source."""
@@ -369,7 +387,9 @@ class AzureSearchClientWrapper:
             )
 
             # Get total count from Azure Search
-            total_count = getattr(results, "get_count", lambda: len(formatted_results))()
+            total_count = getattr(
+                results, "get_count", lambda: len(formatted_results)
+            )()
             returned_count = len(formatted_results)
             has_more = (offset + returned_count) < total_count
 
@@ -431,17 +451,75 @@ class AzureSearchClientWrapper:
             mapped_category = self._map_friction_category(category)
 
             # Build friction-specific filter using the mapped category
-            friction_filter = f"frictionCategories/any(cat: cat eq '{mapped_category}')"
-            quality_filter = self._get_quality_filter(quality_level, source)
-            combined_filter = self._combine_filters(
-                friction_filter, quality_filter, additional_filters
-            )
+            # Handle potential escaping issues with regex patterns in OData filters
+            try:
+                # Try the exact filter first (works if frictionCategories contains the patterns)
+                friction_filter = (
+                    f"frictionCategories/any(cat: cat eq '{mapped_category}')"
+                )
+                quality_filter = self._get_quality_filter(quality_level, source)
+                combined_filter = self._combine_filters(
+                    friction_filter, quality_filter, additional_filters
+                )
+
+                # Test the filter with a minimal query to catch field existence issues early
+                test_client = self._get_search_client(source)
+                test_results = test_client.search(
+                    search_text="*",
+                    filter=combined_filter,
+                    top=1,
+                    include_total_count=True,
+                )
+                # If we get here, the filter works
+
+            except Exception as filter_error:
+                logger.warning(
+                    f"Primary friction filter failed: {filter_error}. Trying fallback approaches."
+                )
+
+                # Fallback 1: Check if frictionCategories field exists at all
+                try:
+                    test_results = test_client.search(
+                        search_text="*",
+                        filter="frictionCategories/any()",
+                        top=1,
+                        include_total_count=True,
+                    )
+                    # Field exists but our value doesn't match - use search instead of filter
+                    logger.info(
+                        "frictionCategories field exists but value mismatch. Using search-based approach."
+                    )
+
+                    # Use search text with the mapped pattern instead of filtering
+                    # This is a more flexible approach for regex-based categorization
+                    quality_filter = self._get_quality_filter(quality_level, source)
+                    combined_filter = self._combine_filters(
+                        quality_filter, additional_filters
+                    )
+
+                    # We'll use the mapped category as search text instead of filter
+                    search_text = mapped_category
+
+                except Exception as field_error:
+                    logger.warning(
+                        f"frictionCategories field doesn't exist: {field_error}. Using search-only approach."
+                    )
+
+                    # Fallback 2: Field doesn't exist - use pure search approach
+                    quality_filter = self._get_quality_filter(quality_level, source)
+                    combined_filter = self._combine_filters(
+                        quality_filter, additional_filters
+                    )
+                    search_text = mapped_category
+            else:
+                # Primary filter worked
+                search_text = "*"
 
             select_fields = self._get_field_selection(detail_level, "friction", source)
 
-            # Execute search with pagination
+            # Execute search with pagination using the determined approach
             results = client.search(
-                search_text="*",  # Search all documents
+                search_text=search_text,  # Use either "*" or the mapped pattern
                 filter=combined_filter,
                 select=select_fields,
                 top=min(max_results, 50),
@@ -454,7 +532,9 @@ class AzureSearchClientWrapper:
             )
 
             # Get total count from Azure Search
-            total_count = getattr(results, "get_count", lambda: len(formatted_results))()
+            total_count = getattr(
+                results, "get_count", lambda: len(formatted_results)
+            )()
             returned_count = len(formatted_results)
             has_more = (offset + returned_count) < total_count
 
@@ -486,14 +566,23 @@ class AzureSearchClientWrapper:
                 error_msg += (
                     f". Available categories: {', '.join(available_categories[:5])}..."
                 )
+            elif "Could not find a property named 'frictionCategories'" in str(e):
+                error_msg += ". The frictionCategories field may not exist in the search index. Check if data has been uploaded with friction analysis."
 
             return {
                 "results": [],
                 "total_count": 0,
                 "error": error_msg,
                 "friction_category": category,
+                "mapped_category": mapped_category
+                if "mapped_category" in locals()
+                else None,
                 "available_categories": self.get_available_friction_categories(),
                 "source": source,
+                "troubleshooting": {
+                    "suggestion": "Try running get_analytics_schema() first to verify available fields and categories",
+                    "field_missing": "frictionCategories" in str(e),
+                },
             }
 
     def aggregate_search(
@@ -607,7 +696,9 @@ class AzureSearchClientWrapper:
             )
 
             # Get total count from Azure Search
-            total_count = getattr(results, "get_count", lambda: len(formatted_results))()
+            total_count = getattr(
+                results, "get_count", lambda: len(formatted_results)
+            )()
             returned_count = len(formatted_results)
             has_more = (offset + returned_count) < total_count
 

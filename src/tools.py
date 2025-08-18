@@ -94,6 +94,37 @@ def register_customer_insights_tools(agent: Agent[AppDependencies, str]) -> None
                     ctx.deps.search_client.get_available_friction_categories()
                 )
 
+                # Test field availability by checking both data sources
+                field_validation = {}
+                for source in ["social", "surveys"]:
+                    try:
+                        # Test if frictionCategories field exists
+                        test_client = ctx.deps.search_client._get_search_client(source)
+                        test_results = test_client.search(
+                            search_text="*",
+                            top=1,
+                            include_total_count=True,
+                        )
+
+                        # Try to access frictionCategories field
+                        friction_test = test_client.search(
+                            search_text="*",
+                            filter="frictionCategories/any()",
+                            top=1,
+                        )
+                        field_validation[source] = {
+                            "total_documents": test_results.get_count(),
+                            "frictionCategories_field_exists": True,
+                            "status": "available",
+                        }
+                    except Exception as validation_error:
+                        field_validation[source] = {
+                            "total_documents": 0,
+                            "frictionCategories_field_exists": False,
+                            "status": "unavailable",
+                            "error": str(validation_error),
+                        }
+
                 # Use search client's metadata capabilities for schema discovery
                 result = json.dumps(
                     {
@@ -121,14 +152,49 @@ def register_customer_insights_tools(agent: Agent[AppDependencies, str]) -> None
                                 "online shopping",
                                 "inventory",
                             ],
+                            "note": "These categories map to regex patterns stored in the frictionCategories field",
+                        },
+                        "field_validation": field_validation,
+                        "diagnostics": {
+                            "total_friction_mappings": len(
+                                available_friction_categories
+                            ),
+                            "schema_check_status": "completed",
+                            "recommendations": [
+                                "Use get_analytics_schema() before friction_search to verify field availability",
+                                "If frictionCategories field is missing, data may need to be re-uploaded with friction analysis",
+                                "For troubleshooting, check if social media upload script completed successfully",
+                            ],
                         },
                     }
                 )
-                step.output = f"Retrieved analytics schema with {len(available_friction_categories)} available friction categories"
+
+                validation_summary = []
+                for source, validation in field_validation.items():
+                    if validation["status"] == "available":
+                        validation_summary.append(
+                            f"{source}: {validation['total_documents']} docs"
+                        )
+                    else:
+                        validation_summary.append(f"{source}: unavailable")
+
+                step.output = f"Schema validated - {', '.join(validation_summary)}. {len(available_friction_categories)} friction categories available."
                 return result
             except Exception as e:
                 logger.error(f"get_analytics_schema failed: {str(e)}")
-                error_msg = json.dumps({"error": f"Schema discovery failed: {str(e)}"})
+                error_msg = json.dumps(
+                    {
+                        "error": f"Schema discovery failed: {str(e)}",
+                        "troubleshooting": {
+                            "suggestion": "Check if Azure Search indices exist and contain data",
+                            "common_causes": [
+                                "Data not uploaded to Azure Search",
+                                "Environment variables not configured correctly",
+                                "Search index not created or corrupted",
+                            ],
+                        },
+                    }
+                )
                 step.output = f"Error: {str(e)}"
                 return error_msg
 

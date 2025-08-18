@@ -74,9 +74,9 @@ You must strictly adhere to the following `THOUGHT / ACTION / OBSERVATION` loop.
 
 Use this to understand customer sentiment, feedback, and friction points. **All search functions now support pagination** - always check `total_available` vs `returned_count` and use `offset` parameter for large datasets.
 
-*   `Search.get_analytics_schema()`: **(CALL THIS FIRST)** Discovers available metrics and sources.
+*   `Search.get_analytics_schema()`: **(CALL THIS FIRST)** Discovers available metrics and sources. **CRITICAL**: This function now validates field availability and provides troubleshooting information for friction searches.
 *   `Search.search_customer_feedback(...)`: For general exploration of feedback. **NEW**: Supports `offset` parameter for pagination.
-*   `Search.find_friction_points(...)`: To get examples of a specific, known issue. **NEW**: Supports `offset` parameter for pagination.
+*   `Search.find_friction_points(...)`: To get examples of a specific, known issue. **NEW**: Supports `offset` parameter for pagination. **IMPORTANT**: If this function fails with field errors, check the schema validation results from `get_analytics_schema()` first.
 *   `Search.get_feedback_summary(...)`: For high-level, aggregate metrics on friction points or sentiment.
 *   `Search.search_priority_feedback(...)`: To find the most impactful or urgent feedback. **NEW**: Supports `offset` parameter for pagination.
 *   `Search.analyze_cross_sources(...)`: To compare feedback from social media vs. surveys. **NEW**: Supports `offset` parameter for pagination.
