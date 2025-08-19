@@ -12,12 +12,37 @@ param location string
 @description('Id of the user or app to assign application roles')
 param principalId string = ''
 
+@secure()
+@description('Azure OpenAI API Key')
+param azureOpenAIApiKey string
+
+@secure()
+@description('Azure Search API Key')  
+param azureSearchApiKey string
+
+@secure()
+@description('SQL Server Password')
+param sqlPassword string
+
+@secure()
+@description('Chainlit Admin Password')
+param chainlitPassword string
+
+@secure()
+@description('Chainlit Authentication Secret - auto-generated if not provided')
+param chainlitAuthSecret string = ''
+
+
 // Optional parameters to override the default azd resource naming conventions. Update the main.parameters.json file to provide values. e.g. "resourceGroupName": "myGroupName"
 param resourceGroupName string = ''
 
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
+
+// Generate a random auth secret if not provided
+var generatedAuthSecret = 'ChainlitAuth${uniqueString(subscription().id, environmentName, resourceToken, '2024')}Key'
+var actualChainlitAuthSecret = !empty(chainlitAuthSecret) ? chainlitAuthSecret : generatedAuthSecret
 
 // Organize resources in a resource group
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -39,6 +64,11 @@ module app './app/app.bicep' = {
     containerAppsEnvironmentName: containerApps.outputs.environmentName
     containerRegistryName: containerApps.outputs.registryName
     keyVaultName: keyVault.outputs.name
+    azureOpenAIApiKey: azureOpenAIApiKey
+    azureSearchApiKey: azureSearchApiKey
+    sqlPassword: sqlPassword
+    chainlitPassword: chainlitPassword
+    chainlitAuthSecret: actualChainlitAuthSecret
     exists: false
   }
 }

@@ -1,19 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
 
 name: farm-and-fleet
-
-hooks:
-  prepackage:
-    shell: sh
-    run: |
-      echo "📦 Preparing deployment..."
-      if [ -f "scripts/setup-secrets.sh" ] && [ -f "secrets" ]; then
-        echo "🔐 Setting up secrets in Key Vault..."
-        ./scripts/setup-secrets.sh
-      else
-        echo "⚠️  Secrets file not found, skipping automatic secret setup"
-      fi
-    continueOnError: false
 services:
   app:
     project: ./src
@@ -58,3 +45,9 @@ services:
         value: "${SQL_TABLES}"
       - name: SQL_DATA_DICTIONARY_PATH
         value: "src/plugins/sqldb/data_dictionaries/"
+      - name: CHAINLIT_USER
+        value: "${CHAINLIT_USER=admin}"
+      - name: CHAINLIT_PASSWORD
+        secret: true
+      - name: CHAINLIT_AUTH_SECRET
+        secret: true

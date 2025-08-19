@@ -337,6 +337,16 @@ def create_dependencies() -> AppDependencies:
     )
 
 
+@cl.password_auth_callback
+async def auth_callback(username: str, password: str) -> cl.User | None:
+    static_username = os.getenv("CHAINLIT_USER", "admin")
+    static_password = os.getenv("CHAINLIT_PASSWORD", "admin")
+    if (username, password) == (static_username, static_password):
+        return cl.User(identifier="admin")
+    else:
+        return None
+
+
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Initialize the PydanticAI agent and dependencies for the chat session."""

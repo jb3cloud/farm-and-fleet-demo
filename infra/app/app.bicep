@@ -12,6 +12,22 @@ param appDefinition object = {}
 param applicationInsightsName string = ''
 param keyVaultName string = ''
 
+@secure()
+param azureOpenAIApiKey string
+
+@secure()  
+param azureSearchApiKey string
+
+@secure()
+param sqlPassword string
+
+@secure()
+param chainlitPassword string
+
+@secure()
+param chainlitAuthSecret string
+
+
 resource userIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: identityName
   location: location
@@ -64,6 +80,26 @@ resource app 'Microsoft.App/containerApps@2023-05-01' = {
         {
           name: 'registry-password'
           value: containerRegistry.listCredentials().passwords[0].value
+        }
+        {
+          name: 'azure-openai-api-key'
+          value: azureOpenAIApiKey
+        }
+        {
+          name: 'azure-search-api-key'
+          value: azureSearchApiKey
+        }
+        {
+          name: 'sql-password'
+          value: sqlPassword
+        }
+        {
+          name: 'chainlit-password'
+          value: chainlitPassword
+        }
+        {
+          name: 'chainlit-auth-secret'
+          value: chainlitAuthSecret
         }
       ]
     }
@@ -132,6 +168,30 @@ resource app 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'SQL_DATA_DICTIONARY_PATH'
               value: 'src/plugins/sqldb/data_dictionaries/'
+            }
+            {
+              name: 'CHAINLIT_USER'
+              value: 'admin'
+            }
+            {
+              name: 'AZURE_OPENAI_API_KEY'
+              secretRef: 'azure-openai-api-key'
+            }
+            {
+              name: 'AZURE_SEARCH_API_KEY'
+              secretRef: 'azure-search-api-key'
+            }
+            {
+              name: 'SQL_PASSWORD'
+              secretRef: 'sql-password'
+            }
+            {
+              name: 'CHAINLIT_PASSWORD'
+              secretRef: 'chainlit-password'
+            }
+            {
+              name: 'CHAINLIT_AUTH_SECRET'
+              secretRef: 'chainlit-auth-secret'
             }
           ]
           resources: {

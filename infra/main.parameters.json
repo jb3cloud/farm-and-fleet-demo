@@ -10,6 +10,21 @@
     },
     "principalId": {
       "value": "${AZURE_PRINCIPAL_ID}"
+    },
+    "azureOpenAIApiKey": {
+      "value": "${AZURE_OPENAI_API_KEY}"
+    },
+    "azureSearchApiKey": {
+      "value": "${AZURE_SEARCH_API_KEY}"
+    },
+    "sqlPassword": {
+      "value": "${SQL_PASSWORD}"
+    },
+    "chainlitPassword": {
+      "value": "${CHAINLIT_PASSWORD}"
+    },
+    "chainlitAuthSecret": {
+      "value": "${CHAINLIT_AUTH_SECRET=}"
     }
   }
 }
