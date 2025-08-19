@@ -1,0 +1,40 @@
+# Python cache and environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Data and logs
+source_data/
+*.log
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Test and coverage artifacts
+.coverage
+htmlcov/
+*.prof
+
+# Docker files themselves
+Dockerfile
+docker-compose.yml
+
+# Azure Developer CLI
+.azure/
+azure.yaml
+infra/

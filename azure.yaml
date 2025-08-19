@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: farm-and-fleet
+
+hooks:
+  prepackage:
+    shell: sh
+    run: |
+      echo "📦 Preparing deployment..."
+      if [ -f "scripts/setup-secrets.sh" ] && [ -f "secrets" ]; then
+        echo "🔐 Setting up secrets in Key Vault..."
+        ./scripts/setup-secrets.sh
+      else
+        echo "⚠️  Secrets file not found, skipping automatic secret setup"
+      fi
+    continueOnError: false
+services:
+  app:
+    project: ./src
+    language: py
+    host: containerapp
+    docker:
+      path: ../Dockerfile
+      context: ..
+      remoteBuild: true
+    env:
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: AZURE_OPENAI_API_KEY
+        secret: true
+      - name: AZURE_OPENAI_ENDPOINT
+        value: "${AZURE_OPENAI_ENDPOINT}"
+      - name: AZURE_OPENAI_MODEL_DEPLOYMENT
+        value: "${AZURE_OPENAI_MODEL_DEPLOYMENT=gpt-5-mini}"
+      - name: AZURE_OPENAI_API_VERSION
+        value: "${AZURE_OPENAI_API_VERSION=2024-12-01-preview}"
+      - name: AZURE_SEARCH_SERVICE_ENDPOINT
+        value: "${AZURE_SEARCH_SERVICE_ENDPOINT}"
+      - name: AZURE_SEARCH_API_KEY
+        secret: true
+      - name: AZURE_SEARCH_INDEX_NAME
+        value: "${AZURE_SEARCH_INDEX_NAME=social-media-index}"
+      - name: AZURE_SEARCH_SURVEY_INDEX_NAME
+        value: "${AZURE_SEARCH_SURVEY_INDEX_NAME=survey-index}"
+      - name: SQL_SERVER
+        value: "${SQL_SERVER}"
+      - name: SQL_PORT
+        value: "${SQL_PORT=1433}"
+      - name: SQL_DATABASE
+        value: "${SQL_DATABASE}"
+      - name: SQL_SCHEMA
+        value: "${SQL_SCHEMA=dbo}"
+      - name: SQL_USERNAME
+        value: "${SQL_USERNAME}"
+      - name: SQL_PASSWORD
+        secret: true
+      - name: SQL_TABLES
+        value: "${SQL_TABLES}"
+      - name: SQL_DATA_DICTIONARY_PATH
+        value: "src/plugins/sqldb/data_dictionaries/"

@@ -165,3 +165,4 @@ source_data/
 
 # Local settings
 *.local.json
+.azure
